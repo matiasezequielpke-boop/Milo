@@ -5,13 +5,20 @@ the app (and the frontend's model picker) never talks to a provider SDK
 directly. Centralizing routing here is deliberate — see the architecture
 blueprint's note on avoiding gateway lock-in.
 
-This module is wired but inert until Fase 0 (API budget) lands: calling
-`complete()` for a provider with no key configured raises a clear
-`ModelNotConfiguredError` rather than failing deep inside a request.
+The routing and streaming logic below is real — it's the same code that
+runs once Fase 0 (API budget) lands. What's still absent is the budget
+itself: calling `complete()` for a provider with no key configured raises
+a clear `ModelNotConfiguredError` rather than failing deep inside a
+request, or worse, faking a response. Writing this for real now (instead
+of leaving it as a stub) costs nothing — it only executes a network call
+when a key is actually present, and none are.
 """
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
+
+import litellm
 
 from app.config import get_settings
 
@@ -50,13 +57,31 @@ def _require_key(model: str) -> tuple[str, str]:
     return litellm_model, key
 
 
-async def complete(request: CompletionRequest):
-    """Route a completion request to the right provider via LiteLLM.
-
-    Deliberately not implemented beyond the key check yet — the actual
-    `litellm.acompletion(...)` call is Fase 1 work, gated on Fase 0 budget.
-    """
-    litellm_model, _key = _require_key(request.model)
-    raise NotImplementedError(
-        f"Gateway wiring for {litellm_model!r} lands with Fase 0 (model API budget)."
+async def complete(request: CompletionRequest) -> str:
+    """Non-streaming completion. Raises ModelNotConfiguredError pre-Fase-0."""
+    litellm_model, api_key = _require_key(request.model)
+    response = await litellm.acompletion(
+        model=litellm_model,
+        messages=request.messages,
+        api_key=api_key,
+        stream=False,
     )
+    return response.choices[0].message.content or ""
+
+
+async def stream_complete(request: CompletionRequest) -> AsyncIterator[str]:
+    """Streaming completion — yields content deltas as they arrive.
+    Raises ModelNotConfiguredError immediately (before any network call)
+    pre-Fase-0, same as `complete()`.
+    """
+    litellm_model, api_key = _require_key(request.model)
+    response = await litellm.acompletion(
+        model=litellm_model,
+        messages=request.messages,
+        api_key=api_key,
+        stream=True,
+    )
+    async for chunk in response:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
