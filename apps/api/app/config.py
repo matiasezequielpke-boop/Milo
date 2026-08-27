@@ -24,6 +24,16 @@ class Settings(BaseSettings):
     google_api_key: str | None = None
     deepseek_api_key: str | None = None
 
+    # Fase 2/3 tool providers — same "empty until funded" rule as the model
+    # keys above. tavily for Scout's web_search, e2b for Ledger's sandbox.
+    tavily_api_key: str | None = None
+    e2b_api_key: str | None = None
+
+    # Fase 5 — vault. Production should set this explicitly (a real
+    # Fernet.generate_key() value); dev derives one from app_secret_key
+    # if unset. See app/vault.py.
+    vault_encryption_key: str | None = None
+
     ntfy_topic: str | None = None
 
     @property
