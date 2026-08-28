@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://milo:milo@localhost:5432/milo"
     redis_url: str = "redis://localhost:6379/0"
 
+    # Identity now lives in Supabase Auth, not this app — see
+    # app/supabase_auth.py. supabase_url + supabase_anon_key are enough to
+    # verify a user's access token; nothing here can mint one.
+    supabase_url: str | None = None
+    supabase_anon_key: str | None = None
+
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     google_api_key: str | None = None

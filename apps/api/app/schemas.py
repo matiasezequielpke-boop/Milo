@@ -8,22 +8,9 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 # --- Auth ---
-
-class RegisterRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=8, max_length=200)
-    display_name: str | None = None
-
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
+# No RegisterRequest/LoginRequest/TokenResponse here anymore — Supabase
+# Auth issues tokens directly to the frontend. This backend only ever
+# reads a user back out (see app/deps.py, app/supabase_auth.py).
 
 class UserResponse(BaseModel):
     id: uuid.UUID

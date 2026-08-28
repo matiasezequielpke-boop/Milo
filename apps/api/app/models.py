@@ -45,11 +45,18 @@ def _uuid_pk() -> Mapped[uuid.UUID]:
 
 
 class User(Base):
+    """Mirrors auth.users, one row per Supabase-authenticated account.
+
+    No password field — Supabase Auth owns credentials entirely (see
+    app/supabase_auth.py). This row is created automatically by the
+    on_auth_user_created trigger the moment someone verifies their
+    email OTP; this app only ever reads it, never inserts into it.
+    """
+
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

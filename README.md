@@ -24,8 +24,8 @@ Full technical blueprint: see the architecture doc in the Claude Project this re
 
 ## What's actually real (read before assuming a feature works)
 
-Real and tested locally against Postgres+pgvector and Redis:
-- Email/password auth (JWT, bcrypt) — register, login, `/auth/me`.
+Real and tested against a live Supabase project (Postgres 17 + pgvector, schema + RLS applied) and Redis:
+- Auth via Supabase (email OTP) — this backend verifies the resulting token against Supabase's `/auth/v1/user` and exposes `/auth/me`; it never sees a password or issues its own token. The code imports clean and the schema is live, but the *end-to-end* flow (a real browser getting a real OTP and reaching `/auth/me`) hasn't run yet — that needs the OTP email provider enabled in the Supabase dashboard first (a one-time, human step) and a deployed backend to point at. See `claude/ruta-a-produccion.md` for the full picture.
 - Conversations + messages, persisted. `POST /conversations/{id}/messages` streams via SSE; with no model key configured it streams a clean `error` event, never a fake response.
 - Waitlist and Suggestions board, persisted (previously client-only state in the prototype — this was the single highest-ROI fix in the backlog, since every real signup was being silently lost on page reload).
 - HITL approval gate: `approval_requests` table + `/approvals` endpoints, enforcing each agent's `requires_approval_for` from `app/agents/definitions.py`.
