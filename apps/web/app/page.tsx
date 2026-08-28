@@ -1,5 +1,7 @@
 import { AGENTS } from "@/lib/agents";
 
+const PROTOTYPE_URL = "https://claude.ai/code/artifact/7aa6dee3-6fc6-4628-a120-fb17d8fa1e45";
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-ink-950 px-6 py-16 sm:px-12">
@@ -38,9 +40,20 @@ export default function Home() {
         <section className="glass p-6">
           <p className="text-sm text-white/50">
             The live console isn&apos;t wired up yet — this is the scaffold
-            for the real backend, not the interactive prototype. The
-            previous click-through demo remains published separately while
-            this gets ported over.
+            for the real backend, not the interactive prototype.
+          </p>
+          <a
+            href={PROTOTYPE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-terracotta-500 px-5 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-terracotta-400"
+          >
+            Try the interactive prototype →
+          </a>
+          <p className="mt-2 text-xs text-white/40">
+            Full click-through demo — chat, agent roster, pricing,
+            suggestions, waitlist. Simulated responses today, not this live
+            backend yet.
           </p>
         </section>
       </div>
