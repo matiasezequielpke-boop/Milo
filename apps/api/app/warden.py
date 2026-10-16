@@ -123,6 +123,11 @@ async def propose_subscription_cancel(
         raise ProposalError("That subscription doesn't exist in this household.")
     if subscription.status != "active":
         raise ProposalError(f"That subscription is already {subscription.status}.")
+    if subscription.kind != "subscription":
+        raise ProposalError(
+            f"{subscription.merchant_name} looks like an essential bill (utility, insurance, rent), not a subscription. "
+            "Warden doesn't cancel those."
+        )
     existing = await _pending_for(db, subscription.household_id, "subscription_id", str(subscription.id))
     if existing is not None:
         return existing
@@ -274,6 +279,7 @@ async def resolve(
             text = f"{who} approved. {approval.summary}: {result.get('next_step', '')}"
     except ExecutionError as exc:
         approval.execution_result = {"status": "failed", "error": str(exc)}
+        await _fail_bill(db, approval)
         text = f"{who} approved, but it could not be completed: {exc} No money moved."
         await audit.record(
             db, event_type="execution.failed", agent_id="warden", household_id=approval.household_id,
@@ -290,6 +296,15 @@ async def _release_bill(db: AsyncSession, approval: ApprovalRequest) -> None:
         bill = await db.get(Bill, uuid.UUID(approval.payload["bill_id"]))
         if bill is not None and bill.status == "pending_approval":
             bill.status = "open"
+
+
+async def _fail_bill(db: AsyncSession, approval: ApprovalRequest) -> None:
+    """A failed execution must leave the bill retryable ("Ask to pay"
+    again), not stuck behind an approval that will never run."""
+    if approval.action_type == "bill_payment":
+        bill = await db.get(Bill, uuid.UUID(approval.payload["bill_id"]))
+        if bill is not None and bill.status in ("pending_approval", "processing"):
+            bill.status = "failed"
 
 
 async def _notify_outcome(db: AsyncSession, approval: ApprovalRequest, subject: str, body: str) -> None:

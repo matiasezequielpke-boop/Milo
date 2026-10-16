@@ -135,3 +135,19 @@ def test_alerts_are_stable_across_reruns():
     first = detect(rows, today=TODAY).findings
     second = detect(rows, today=TODAY).findings
     assert [(f.kind, f.dedupe_key) for f in first] == [(f.kind, f.dedupe_key) for f in second]
+
+
+def test_recurring_utility_is_a_bill_not_a_subscription():
+    rows = [t(f"u{i}", 5 + 30 * i, 80 + i, "CONED UTILITY PMT", "ConEd") for i in range(4)]
+    [stream] = find_recurring(rows)
+    assert stream.kind == "bill"
+    rows = [t(f"x{i}", 5 + 30 * i, 120, "STATE FARM", "State Farm", ) for i in range(3)]
+    plaid_categorized = [Txn(r.id, r.date, r.amount, r.name, r.merchant_name, category="RENT_AND_UTILITIES") for r in rows]
+    assert find_recurring(plaid_categorized)[0].kind == "bill"
+
+
+def test_new_bill_does_not_raise_new_subscription_alert():
+    old = [t(f"o{i}", 5 + 30 * i, 10.99, "SPOTIFY", "Spotify") for i in range(8)]
+    utility = [t(f"u{i}", 5 + 30 * i, 64.10, "NATIONAL GRID ELECTRIC") for i in range(2)]
+    result = detect(old + utility, today=TODAY)
+    assert "new_subscription" not in kinds(result)

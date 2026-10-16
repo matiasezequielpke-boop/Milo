@@ -272,6 +272,7 @@ class AlertResolveRequest(BaseModel):
 class SubscriptionResponse(BaseModel):
     id: uuid.UUID
     merchant_name: str
+    kind: str
     average_amount: Decimal
     last_amount: Decimal
     cadence_days: int

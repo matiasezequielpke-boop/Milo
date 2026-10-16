@@ -241,6 +241,7 @@ async def list_subscriptions(ctx: ToolContext, _: NoInput) -> dict:
             {
                 "subscription_id": str(s.id),
                 "merchant": s.merchant_name,
+                "kind": s.kind,
                 "last_amount": _money(s.last_amount),
                 "every_days": s.cadence_days,
                 "times_charged": s.charge_count,
@@ -395,7 +396,7 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool(
         name="list_subscriptions",
-        description="Recurring charges detected from the transaction history, with their subscription_id for cancellation requests.",
+        description="Recurring charges detected from the transaction history: kind 'subscription' (streaming, memberships — can be cancelled) or 'bill' (utilities, insurance, rent — essential, don't suggest cancelling). Includes subscription_id for cancellation requests.",
         input_model=NoInput,
         input_schema=_schema({}),
         handler=list_subscriptions,

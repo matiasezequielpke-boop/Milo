@@ -189,6 +189,11 @@ async def test_payment_without_stripe_key_fails_cleanly(client, family):
     result = r.json()["execution_result"]
     assert result["status"] == "failed"
     assert "STRIPE_SECRET_KEY" in result["error"]
+    # The bill can be asked for again rather than staying stuck.
+    bills = (await client.get(f"/households/{hid}/bills", headers=auth(ROSA))).json()
+    assert bills[0]["status"] == "failed"
+    retry = await client.post(f"/households/{hid}/bills/{bill['id']}/request-payment", headers=auth(ROSA))
+    assert retry.status_code == 201 and retry.json()["id"] != approval["id"]
 
 
 async def test_live_stripe_key_is_refused_by_default(client, family, monkeypatch):

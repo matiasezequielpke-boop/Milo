@@ -44,6 +44,7 @@ async def run_detection(db: AsyncSession, household_id: uuid.UUID, *, today: dat
             name=r.name,
             merchant_name=r.merchant_name,
             pending=r.pending,
+            category=r.category,
         )
         for r in rows
     ]
@@ -77,6 +78,7 @@ async def run_detection(db: AsyncSession, household_id: uuid.UUID, *, today: dat
             household_id=household_id,
             merchant_key=s.merchant_key,
             merchant_name=s.merchant_name,
+            kind=s.kind,
             average_amount=s.average_amount,
             last_amount=s.last_amount,
             cadence_days=s.cadence_days,
@@ -90,6 +92,7 @@ async def run_detection(db: AsyncSession, household_id: uuid.UUID, *, today: dat
                 constraint="uq_subscription_merchant",
                 set_={
                     "merchant_name": stmt.excluded.merchant_name,
+                    "kind": stmt.excluded.kind,
                     "average_amount": stmt.excluded.average_amount,
                     "last_amount": stmt.excluded.last_amount,
                     "cadence_days": stmt.excluded.cadence_days,

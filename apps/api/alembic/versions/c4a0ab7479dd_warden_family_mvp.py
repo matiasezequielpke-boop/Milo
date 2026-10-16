@@ -68,6 +68,7 @@ def upgrade() -> None:
     sa.Column('household_id', sa.UUID(), nullable=False),
     sa.Column('merchant_key', sa.String(length=200), nullable=False),
     sa.Column('merchant_name', sa.String(length=200), nullable=False),
+    sa.Column('kind', sa.String(length=20), nullable=False),
     sa.Column('average_amount', sa.Numeric(precision=14, scale=2), nullable=False),
     sa.Column('last_amount', sa.Numeric(precision=14, scale=2), nullable=False),
     sa.Column('cadence_days', sa.Integer(), nullable=False),

@@ -1,37 +1,29 @@
 import type { Config } from "tailwindcss";
 
-// Design tokens per claude/frontend-design-system.md (Milo v7):
-// Liquid Glass material (blur + saturate + edge refraction) with a
-// terracotta/orange accent instead of the typical iOS blue.
+// Warden console: monochrome, chat-first, no ornament (the Grok-like
+// direction). Colour is reserved for meaning only — red for fraud/block,
+// amber for "needs a look", green for "done". Type runs large because
+// half the people reading it are in their 70s.
 const config: Config = {
-  content: ["./app/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}"],
+  content: ["./app/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   darkMode: "class",
   theme: {
     extend: {
       colors: {
-        terracotta: {
-          50: "#fdf3ee",
-          100: "#fbe4d8",
-          200: "#f6c5ab",
-          300: "#efa078",
-          400: "#e67a4c",
-          500: "#d9622f",
-          600: "#b84c22",
-          700: "#953b1c",
-          800: "#78311c",
-          900: "#632a1a",
-        },
         ink: {
-          950: "#0b0a09",
-          900: "#131110",
-          800: "#1c1917",
+          950: "#000000",
+          900: "#0a0a0a",
+          850: "#111111",
+          800: "#161616",
+          700: "#1f1f1f",
+          600: "#2a2a2a",
         },
       },
-      backdropBlur: {
-        glass: "20px",
+      fontSize: {
+        base: ["1.0625rem", { lineHeight: "1.6" }],
       },
-      borderRadius: {
-        glass: "20px",
+      maxWidth: {
+        chat: "46rem",
       },
     },
   },

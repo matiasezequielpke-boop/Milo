@@ -498,6 +498,8 @@ class Subscription(Base):
     )
     merchant_key: Mapped[str] = mapped_column(String(200), nullable=False)
     merchant_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    # "subscription" (cancellable) or "bill" (utilities, insurance, rent).
+    kind: Mapped[str] = mapped_column(String(20), default="subscription", nullable=False)
     average_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     last_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     cadence_days: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -357,6 +357,7 @@ async def list_subscriptions(
         SubscriptionResponse(
             id=s.id,
             merchant_name=s.merchant_name,
+            kind=s.kind,
             average_amount=s.average_amount,
             last_amount=s.last_amount,
             cadence_days=s.cadence_days,

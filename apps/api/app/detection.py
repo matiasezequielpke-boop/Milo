@@ -32,6 +32,14 @@ MONEY_TRANSFER = re.compile(r"western\s*union|moneygram|wire\s*(transfer|out|to)
 CRYPTO = re.compile(r"coinbase|binance|kraken|crypto|bitcoin|\bbtc\b|coinflip|bitcoin\s*depot|athena\s*bitcoin|coinme|gemini\s*trust")
 P2P = re.compile(r"zelle|venmo|cash\s*app|\bsquare\s*cash\b|paypal")
 CASH = re.compile(r"\batm\b|cash\s*withdrawal|withdrawal")
+# Recurring charges that are bills, not subscriptions: nobody should be
+# nudged to "cancel" the electricity. Matched on Plaid's category when
+# present, otherwise on the merchant text.
+ESSENTIAL_CATEGORIES = {"RENT_AND_UTILITIES", "LOAN_PAYMENTS", "GOVERNMENT_AND_NON_PROFIT", "BANK_FEES", "MEDICAL"}
+ESSENTIAL = re.compile(
+    r"util|electric|power|energy|con\s*ed|water|sewer|gas\s*(co|company|service)|insurance|mortgage|rent\b|"
+    r"medicare|pharmacy|phone|wireless|verizon|at\s*t|t-mobile|comcast|xfinity|spectrum|internet|cable|property\s*tax"
+)
 
 _NOISE = re.compile(
     r"\b(pos|debit|credit|purchase|card|ach|payment|pmt|recurring|online|www|com|inc|llc|co|ref|id|des|indn|ppd|web)\b"
@@ -47,6 +55,7 @@ class Txn:
     name: str
     merchant_name: str | None = None
     pending: bool = False
+    category: str | None = None
 
     @property
     def label(self) -> str:
@@ -79,6 +88,8 @@ class RecurringStream:
     first_date: date
     charge_count: int
     transaction_ids: list[str] = field(default_factory=list)
+    # "subscription" (can be cancelled) or "bill" (utilities, insurance...).
+    kind: str = "subscription"
 
     @property
     def average_amount(self) -> Decimal:
@@ -170,8 +181,13 @@ def find_recurring(txns: list[Txn]) -> list[RecurringStream]:
             Decimal("0.02") if cadence < 30 else Decimal("0.25"),
         ):
             continue
+        last = recent[-1]
+        essential = (last.category or "").upper() in ESSENTIAL_CATEGORIES or bool(
+            ESSENTIAL.search(f"{last.name} {last.merchant_name or ''}".lower())
+        )
         streams.append(
             RecurringStream(
+                kind="bill" if essential else "subscription",
                 merchant_key=key,
                 merchant_name=recent[-1].label,
                 cadence_days=cadence,
@@ -340,7 +356,11 @@ def detect(txns: list[Txn], *, today: date | None = None, lookback_days: int = 3
         # A recently started subscription is the classic free-trial trap.
         # Only call it "new" if we've watched at least 60 days without it —
         # on a first bank connection everything would otherwise look new.
-        if s.first_date >= today - timedelta(days=100) and (s.first_date - history_start).days >= 60:
+        if (
+            s.kind == "subscription"
+            and s.first_date >= today - timedelta(days=100)
+            and (s.first_date - history_start).days >= 60
+        ):
             findings.append(
                 Finding(
                     kind="new_subscription",
