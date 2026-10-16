@@ -285,7 +285,9 @@ async def list_alerts(
         .where(Alert.household_id == household_id)
     )
     if status_filter and status_filter != "all":
-        query = query.where(Alert.status == status_filter)
+        if status_filter not in AlertStatus.__members__:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown status {status_filter!r}.")
+        query = query.where(Alert.status == AlertStatus(status_filter))
     result = await db.execute(query.order_by(Alert.created_at.desc()).limit(200))
     return [_alert(a, t) for a, t in result.all()]
 

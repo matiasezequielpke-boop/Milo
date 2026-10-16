@@ -68,7 +68,7 @@ async def execute(db: AsyncSession, approval: ApprovalRequest) -> dict:
 
 async def _pay_bill(db: AsyncSession, approval: ApprovalRequest) -> dict:
     payload = approval.payload
-    bill = await db.get(Bill, uuid.UUID(payload["bill_id"]), with_for_update=True)
+    bill = await db.get(Bill, uuid.UUID(payload["bill_id"]), with_for_update=True, populate_existing=True)
     if bill is None or bill.household_id != approval.household_id:
         raise ExecutionError("The bill no longer exists.")
     if bill.status not in ("open", "pending_approval", "failed"):
@@ -165,7 +165,9 @@ async def _pay_bill(db: AsyncSession, approval: ApprovalRequest) -> dict:
 
 
 async def _cancel_subscription(db: AsyncSession, approval: ApprovalRequest) -> dict:
-    subscription = await db.get(Subscription, uuid.UUID(approval.payload["subscription_id"]), with_for_update=True)
+    subscription = await db.get(
+        Subscription, uuid.UUID(approval.payload["subscription_id"]), with_for_update=True, populate_existing=True
+    )
     if subscription is None or subscription.household_id != approval.household_id:
         raise ExecutionError("The subscription no longer exists.")
     if subscription.status != "active":

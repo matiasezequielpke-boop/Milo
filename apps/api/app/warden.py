@@ -215,8 +215,16 @@ async def resolve(
     approve: bool,
     note: str | None = None,
 ) -> ApprovalRequest:
+    # populate_existing: the row may already be in this session's identity
+    # map (the router loaded it); without it, a second approver racing the
+    # first would see the stale "pending" status after waiting on the lock.
     approval = (
-        await db.execute(select(ApprovalRequest).where(ApprovalRequest.id == approval_id).with_for_update())
+        await db.execute(
+            select(ApprovalRequest)
+            .where(ApprovalRequest.id == approval_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
     ).scalar_one_or_none()
     if approval is None or approval.household_id is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval request not found")

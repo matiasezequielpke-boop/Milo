@@ -219,3 +219,22 @@ async def test_money_actions_cannot_be_created_through_raw_approvals_endpoint(cl
         headers=auth(ANA),
     )
     assert r.status_code == 400
+
+
+async def test_concurrent_approvals_execute_once(client, family, fake_stripe):
+    import asyncio
+
+    hid = family["household_id"]
+    bill = await _bill(client, hid)
+    approval = (await client.post(f"/households/{hid}/bills/{bill['id']}/request-payment", headers=auth(ROSA))).json()
+    first, second = await asyncio.gather(
+        client.post(f"/approvals/{approval['id']}/approve", headers=auth(ANA)),
+        client.post(f"/approvals/{approval['id']}/approve", headers=auth(ANA)),
+    )
+    assert sorted([first.status_code, second.status_code]) == [200, 409]
+    assert len(fake_stripe) == 1
+
+
+async def test_unknown_alert_status_is_a_400(client, family):
+    r = await client.get(f"/households/{family['household_id']}/alerts?status_filter=bogus", headers=auth(ANA))
+    assert r.status_code == 400

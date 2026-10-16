@@ -257,8 +257,13 @@ async def run_turn(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str) ->
                         },
                     )
                     await warden.notify_requested(db, approval)
-                # Re-read permissions for the next round (consent can change).
-                membership = await get_membership(db, conversation.household_id, user) or membership
+                # Re-read permissions for the next round (consent can change,
+                # or the person can be removed from the household).
+                refreshed = await get_membership(db, conversation.household_id, user)
+                if refreshed is None:
+                    yield _sse("error", {"message": "You're no longer a member of this household."})
+                    return
+                membership = refreshed
             else:
                 yield _sse("error", {"message": "Milo needed too many steps for that. Try a simpler request."})
 
