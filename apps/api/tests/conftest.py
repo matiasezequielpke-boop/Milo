@@ -33,6 +33,18 @@ def migrated_db():
 
 
 @pytest.fixture(autouse=True)
+def fresh_settings():
+    """Settings are cached; a test that monkeypatches env vars must not leak
+    a cached copy into the next test (monkeypatch restores the env only
+    after the test's own teardown has run)."""
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 async def clean_tables(migrated_db):
     from app.db import engine
     from app.models import Base
