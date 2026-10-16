@@ -21,10 +21,12 @@ async def record(
     user_id: uuid.UUID | None = None,
     agent_id: str | None = None,
     detail: dict | None = None,
+    household_id: uuid.UUID | None = None,
 ) -> AuditLogEntry:
     entry = AuditLogEntry(
         event_type=event_type,
         user_id=user_id,
+        household_id=household_id,
         agent_id=agent_id,
         detail=detail or {},
     )

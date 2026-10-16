@@ -2,20 +2,36 @@
 
 Wires the routers built out across Fase 1 (auth, chat/SSE), the "Ahora"
 persisted waitlist + suggestions, Fase 5 (approvals, credentials/vault),
-and the Fase 6 monitor scaffold. None of this makes a live model call
-work without real API keys — see README's Fase 0 — it just means the
-plumbing is no longer the missing piece once keys exist.
+the Fase 6 monitor scaffold, and the Warden MVP (households + consent,
+banking via Plaid, the family approval gate, and the live agent in chat).
+Every integration stays inert — with a clear error, never a fake result —
+until its key is configured.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.agents.definitions import AGENTS
 from app.config import get_settings
-from app.routers import approvals, auth, chat, credentials, monitors, suggestions, waitlist
+from app.routers import (
+    approvals,
+    auth,
+    banking,
+    chat,
+    credentials,
+    households,
+    monitors,
+    suggestions,
+    waitlist,
+)
 
 settings = get_settings()
 
-app = FastAPI(title="Milo API", version="0.1.0")
+if settings.dev_auth_enabled and settings.app_env != "development":
+    # Dev auth accepts `Bearer dev:<email>` with no proof of identity. It
+    # must never be reachable outside a laptop/CI; refuse to boot instead.
+    raise RuntimeError("DEV_AUTH_ENABLED is set outside APP_ENV=development. Refusing to start.")
+
+app = FastAPI(title="Warden API", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,11 +48,34 @@ app.include_router(suggestions.router)
 app.include_router(approvals.router)
 app.include_router(credentials.router)
 app.include_router(monitors.router)
+app.include_router(households.router)
+app.include_router(banking.router)
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "env": settings.app_env}
+
+
+@app.get("/integrations")
+async def integrations():
+    """Which real integrations are switched on in this deployment — the
+    frontend shows setup hints instead of failing silently."""
+    return {
+        "model": bool(settings.anthropic_api_key),
+        "model_id": settings.warden_model,
+        "plaid": bool(settings.plaid_client_id and settings.plaid_secret),
+        "plaid_env": settings.plaid_env,
+        "stripe": bool(settings.stripe_secret_key),
+        "stripe_mode": (
+            "live" if (settings.stripe_secret_key or "").startswith(("sk_live_", "rk_live_")) else "test"
+        )
+        if settings.stripe_secret_key
+        else None,
+        "email": bool(settings.resend_api_key),
+        "push": bool(settings.ntfy_topic),
+        "dev_auth": settings.dev_auth_enabled and settings.app_env == "development",
+    }
 
 
 @app.get("/agents")

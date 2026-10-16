@@ -47,6 +47,8 @@ async def request_approval(
     action_type: str,
     payload: dict,
     conversation_id: uuid.UUID | None = None,
+    household_id: uuid.UUID | None = None,
+    summary: str | None = None,
 ) -> ApprovalRequest:
     agent = get_agent(agent_id)
     if action_type not in agent.requires_approval_for:
@@ -54,18 +56,21 @@ async def request_approval(
 
     approval = ApprovalRequest(
         user_id=user_id,
+        household_id=household_id,
         conversation_id=conversation_id,
         agent_id=agent_id,
         action_type=action_type,
         payload=payload,
+        summary=summary,
         status=ApprovalStatus.pending,
     )
     db.add(approval)
+    await db.flush()
     await audit.record(
         db, event_type="approval.requested", user_id=user_id, agent_id=agent_id,
-        detail={"action_type": action_type},
+        household_id=household_id,
+        detail={"action_type": action_type, "approval_id": str(approval.id), "summary": summary},
     )
-    await db.flush()
     return approval
 
 

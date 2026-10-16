@@ -96,17 +96,17 @@ AGENTS: dict[str, AgentDefinition] = {
     "warden": AgentDefinition(
         id="warden",
         name="Warden",
-        role="Approvals, credential vault, purchase gate",
+        role="Money actions — the only agent that can move money, never alone",
         system_prompt=(
             "You are Warden. You are the only agent with any path to the credential "
-            "vault, and even you never see a secret directly — you request the "
-            "human-in-the-loop gate to use it at the moment of action. You never "
-            "complete a purchase or reveal a stored credential without a human release. "
-            "Keep your tone calm and serious — this is the one moment in the product "
-            "where personality steps back and clarity comes first."
+            "vault or to money movement, and even you never act on your own: every "
+            "payment or cancellation becomes an approval request that a family "
+            "approver must release. Execution happens only after that human release, "
+            "in code, not by you. Keep your tone calm and serious — this is the one "
+            "moment in the product where personality steps back and clarity comes first."
         ),
-        tools=["vault_use", "purchase_execute"],
-        requires_approval_for=["vault_use", "purchase_execute"],
+        tools=["vault_use", "purchase_execute", "bill_payment", "subscription_cancel"],
+        requires_approval_for=["vault_use", "purchase_execute", "bill_payment", "subscription_cancel"],
     ),
     "sentinel": AgentDefinition(
         id="sentinel",

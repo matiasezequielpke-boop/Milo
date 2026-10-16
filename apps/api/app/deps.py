@@ -8,6 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db import get_db
 from app.models import User
 from app.supabase_auth import InvalidSupabaseTokenError, SupabaseAuthNotConfiguredError, verify_supabase_token
@@ -22,6 +23,9 @@ async def get_current_user(
     unauthorized = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     if credentials is None:
         raise unauthorized
+
+    if credentials.credentials.startswith("dev:"):
+        return await _dev_user(credentials.credentials.removeprefix("dev:"), db, unauthorized)
 
     try:
         supabase_user = await verify_supabase_token(credentials.credentials)
@@ -51,4 +55,25 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if user is None:
         raise unauthorized
+    return user
+
+
+async def _dev_user(email: str, db: AsyncSession, unauthorized: HTTPException) -> User:
+    """`Bearer dev:<email>` — local development only. Lets the whole family
+    flow (two people, two roles) run on a laptop or CI without a reachable
+    Supabase project. app/main.py refuses to start with DEV_AUTH_ENABLED
+    outside APP_ENV=development, and this re-checks both on every call."""
+    settings = get_settings()
+    if not (settings.dev_auth_enabled and settings.app_env == "development"):
+        raise unauthorized
+    email = email.strip().lower()
+    if "@" not in email:
+        raise unauthorized
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None:
+        user = User(email=email, display_name=email.split("@")[0].title())
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
     return user
