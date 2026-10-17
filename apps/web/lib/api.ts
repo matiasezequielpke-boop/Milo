@@ -1,4 +1,4 @@
-import { getToken } from "@/lib/auth";
+import { currentToken, getSession, setSession } from "@/lib/auth";
 
 // No API configured → null, and the app says so instead of calling
 // localhost from a public page. In `next dev` it defaults to the local API.
@@ -14,8 +14,44 @@ export class ApiError extends Error {
   }
 }
 
-function headers(extra?: HeadersInit): HeadersInit {
-  const token = getToken();
+let refreshing: Promise<boolean> | null = null;
+
+/** Swaps the refresh token for a new access token (same session). Any
+ *  failure ends the session — the person logs in again. */
+async function refreshSession(): Promise<boolean> {
+  const s = getSession();
+  if (!s || !API_URL) return false;
+  refreshing ??= (async () => {
+    try {
+      const res = await fetch(`${API_URL}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: s.refresh_token }),
+      });
+      if (!res.ok) throw new Error("refresh failed");
+      const body = await res.json();
+      setSession({ access_token: body.access_token, refresh_token: body.refresh_token, expires_at: body.expires_at, email: s.email });
+      return true;
+    } catch {
+      endSession();
+      return false;
+    } finally {
+      refreshing = null;
+    }
+  })();
+  return refreshing;
+}
+
+function endSession() {
+  if (!getSession()) return;
+  setSession(null);
+  window.dispatchEvent(new Event("warden:signed-out"));
+}
+
+async function headers(extra?: HeadersInit): Promise<HeadersInit> {
+  const s = getSession();
+  if (s && s.expires_at * 1000 - Date.now() < 60_000) await refreshSession();
+  const token = currentToken();
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -42,16 +78,36 @@ async function send(path: string, init: RequestInit): Promise<Response> {
   }
 }
 
-export async function api<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
+async function request(path: string, init: { method?: string; body?: unknown; accept?: string }, retry = true): Promise<Response> {
   const res = await send(path, {
-    method: init?.method || (init?.body !== undefined ? "POST" : "GET"),
-    headers: headers(),
-    body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+    method: init.method || (init.body !== undefined ? "POST" : "GET"),
+    headers: await headers(init.accept ? { Accept: init.accept } : undefined),
+    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
+  if (res.status === 401 && retry && getSession()) {
+    if (await refreshSession()) return request(path, init, false);
+  } else if (res.status === 401 && getSession()) {
+    endSession();
+  }
+  return res;
+}
+
+export async function api<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
+  const res = await request(path, init || {});
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, detail(body, `Request failed (${res.status})`));
   return body as T;
+}
+
+/** For downloads (the data export): the raw response as a Blob. */
+export async function apiBlob(path: string): Promise<Blob> {
+  const res = await request(path, {});
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new ApiError(res.status, detail(body, `Request failed (${res.status})`));
+  }
+  return res.blob();
 }
 
 export type StreamEvent =
@@ -73,7 +129,7 @@ export async function streamChat(
 ): Promise<void> {
   const res = await send(`/conversations/${conversationId}/messages`, {
     method: "POST",
-    headers: headers({ Accept: "text/event-stream" }),
+    headers: await headers({ Accept: "text/event-stream" }),
     body: JSON.stringify({ content }),
     signal,
   });

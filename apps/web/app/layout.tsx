@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit, Space_Grotesk } from "next/font/google";
 
+import { CookieNotice } from "@/components/CookieNotice";
+
 import "./globals.css";
 
 const outfit = Outfit({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-outfit", display: "swap" });
@@ -30,7 +32,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <CookieNotice />
+      </body>
     </html>
   );
 }

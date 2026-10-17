@@ -1,30 +1,58 @@
-// No sign-in for now: the API runs in DEMO_MODE and accepts
-// `Bearer demo:<email>` for the two demo people only (Rosa, the account
-// owner, and Ana, her approver). Which one you're viewing as is a
-// per-browser convenience, so it lives in localStorage.
-const KEY = "warden.demoEmail";
-let current: string | null = null;
+// Two ways in:
+// - A real account: a Supabase session that this app's API opened (sign-up,
+//   or password + emailed code). Kept in localStorage and refreshed before
+//   it expires (lib/api.ts).
+// - The demo family, when the API runs in DEMO_MODE: `demo:<email>`.
+export type Session = { access_token: string; refresh_token: string; expires_at: number; email: string };
+
+const SESSION_KEY = "warden.session";
+const DEMO_KEY = "warden.demoEmail";
+
+let session: Session | null | undefined;
+let demo: string | null | undefined;
+
+function read<T>(key: string): T | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function write(key: string, value: unknown) {
+  try {
+    if (value === null) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage unavailable: the sign-in just won't survive a reload */
+  }
+}
+
+export function getSession(): Session | null {
+  if (session === undefined) session = typeof window === "undefined" ? null : read<Session>(SESSION_KEY);
+  return session;
+}
+
+export function setSession(next: Session | null) {
+  session = next;
+  write(SESSION_KEY, next);
+  if (next) setDemoEmail(null);
+}
 
 export function getDemoEmail(): string | null {
-  if (current) return current;
-  try {
-    current = window.localStorage.getItem(KEY);
-  } catch {
-    current = null;
-  }
-  return current;
+  if (demo === undefined) demo = typeof window === "undefined" ? null : read<string>(DEMO_KEY);
+  return demo;
 }
 
-export function setDemoEmail(email: string) {
-  current = email;
-  try {
-    window.localStorage.setItem(KEY, email);
-  } catch {
-    /* storage unavailable: the choice just won't survive a reload */
-  }
+export function setDemoEmail(email: string | null) {
+  demo = email;
+  write(DEMO_KEY, email);
 }
 
-export function getToken(): string | null {
-  const email = getDemoEmail();
-  return email ? `demo:${email}` : null;
+export function currentToken(): string | null {
+  const s = getSession();
+  if (s) return s.access_token;
+  const d = getDemoEmail();
+  return d ? `demo:${d}` : null;
 }

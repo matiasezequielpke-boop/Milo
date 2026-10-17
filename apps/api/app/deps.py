@@ -10,8 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_db
-from app.models import User
-from app.supabase_auth import InvalidSupabaseTokenError, SupabaseAuthNotConfiguredError, verify_supabase_token
+from app.models import AuthSession, User
+from app.supabase_auth import (
+    InvalidSupabaseTokenError,
+    SupabaseAuthNotConfiguredError,
+    token_claims,
+    verify_supabase_token,
+)
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -44,17 +49,19 @@ async def get_current_user(
 
     try:
         user_id = uuid.UUID(supabase_user["id"])
-    except (KeyError, ValueError) as exc:
+        session_id = uuid.UUID(token_claims(credentials.credentials)["session_id"])
+    except (KeyError, ValueError, InvalidSupabaseTokenError) as exc:
         raise unauthorized from exc
 
-    # public.users is populated by the on_auth_user_created trigger the
-    # moment Supabase creates the auth.users row, so this should always
-    # find a match. If it doesn't (trigger disabled, or a token from a
-    # different Supabase project), treat it the same as "not
-    # authenticated" rather than silently creating a row here — this
-    # dependency verifies identity, it doesn't provision accounts.
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    # A valid Supabase token isn't enough on its own: its session must have
+    # been opened through this API (sign-up, or password + emailed code —
+    # see app/routers/auth.py). Anything else, including a session signed
+    # out here, is refused.
+    recorded = await db.get(AuthSession, session_id)
+    if recorded is None or recorded.revoked_at is not None or recorded.user_id != user_id:
+        raise unauthorized
+
+    user = await db.get(User, user_id)
     if user is None:
         raise unauthorized
     return user

@@ -15,6 +15,7 @@ export function AgentSheet({ agentId, onClose }: { agentId: string | null; onClo
   const router = useRouter();
   const app = useApp();
   const closeBtn = useRef<HTMLButtonElement>(null);
+  const sheetRef = useRef<HTMLElement>(null);
   const returnTo = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -29,7 +30,22 @@ export function AgentSheet({ agentId, onClose }: { agentId: string | null; onClo
     if (!open) return;
     returnTo.current = document.activeElement as HTMLElement | null;
     const t = setTimeout(() => closeBtn.current?.focus(), 30);
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && onCloseRef.current();
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCloseRef.current();
+      // Keep Tab inside the open sheet (it's modal).
+      if (e.key === "Tab" && sheetRef.current) {
+        const items = sheetRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), a[href]");
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
+    };
     window.addEventListener("keydown", esc);
     return () => {
       clearTimeout(t);
@@ -73,6 +89,7 @@ export function AgentSheet({ agentId, onClose }: { agentId: string | null; onClo
     <>
       <div className={`veil ${open ? "on" : ""}`} onClick={onClose} aria-hidden="true" />
       <aside
+        ref={sheetRef}
         className={`sheet glass deep ${open ? "on" : ""}`}
         role="dialog"
         aria-modal="true"
@@ -91,7 +108,7 @@ export function AgentSheet({ agentId, onClose }: { agentId: string | null; onClo
         </div>
         <div className="sb">
           <div className="hero">
-            <Toy kind={a.kind} />
+            <Toy kind={a.kind} label={`${a.name}, drawn as a small plush character`} />
           </div>
           <p className="about">{a.about}</p>
           <h4>Status</h4>

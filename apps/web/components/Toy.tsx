@@ -195,21 +195,25 @@ function toySvg(kind: ToyKind, id: string, moodOverride?: "flat") {
   </svg>`;
 }
 
+/** Decorative by default (the agent's name is always written next to it).
+ *  Pass `label` where the picture stands on its own. */
 export function Toy({
   kind,
   className = "toy",
   status,
   style,
+  label,
 }: {
   kind: ToyKind;
   className?: string;
   status?: "live" | "idle" | "busy";
   style?: React.CSSProperties;
+  label?: string;
 }) {
   // SVG ids must be unique per instance; useId is stable across SSR/CSR.
   const id = `t${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
-    <span className={className} style={style}>
+    <span className={className} style={style} {...(label ? { role: "img", "aria-label": label } : { "aria-hidden": true })}>
       <span style={{ display: "block", width: "100%", height: "100%" }} dangerouslySetInnerHTML={{ __html: toySvg(kind, id) }} />
       {status && <span className={`st ${status}`} />}
     </span>

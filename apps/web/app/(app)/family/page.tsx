@@ -6,7 +6,7 @@ import { Chip, Notice, Ready } from "@/components/ui";
 import { api } from "@/lib/api";
 import { ALL_SCOPES, SCOPE_TEXT } from "@/lib/consent";
 import { useActiveHousehold, useApp } from "@/lib/store";
-import type { Household, Member, Scope } from "@/lib/types";
+import type { Household, InviteResult, Member, Scope } from "@/lib/types";
 
 /** The account owner's consent, one switch per scope. Saved on each flip
  *  so what's shown is always what's in force. */
@@ -67,6 +67,7 @@ function Consent({ household, approver, editable }: { household: Household; appr
 
 function Family() {
   const household = useActiveHousehold();
+  const mode = useApp((s) => s.mode);
   if (!household) return null;
   const isElder = household.my_role === "elder";
   const elder = household.members.find((m) => m.role === "elder");
@@ -109,9 +110,77 @@ function Family() {
         </section>
       ))}
 
-      <h3>Inviting family</h3>
-      <Notice>Invites need sign-in, which is switched off in this demo. The demo family is {household.members.map((m) => m.display_name).join(" and ")}.</Notice>
+      <h3>Invite family</h3>
+      {mode === "demo" ? (
+        <Notice>The demo family is fixed: {household.members.map((m) => m.display_name).join(" and ")}.</Notice>
+      ) : (
+        <InviteForm household={household} />
+      )}
     </>
+  );
+}
+
+function InviteForm({ household }: { household: Household }) {
+  const refreshHouseholds = useApp((s) => s.refreshHouseholds);
+  const hasOwner = household.members.some((m) => m.role === "elder");
+  const [form, setForm] = useState({ email: "", display_name: "" });
+  const [result, setResult] = useState<InviteResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <form
+      className="card glass"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError(null);
+        try {
+          setResult(
+            await api<InviteResult>(`/households/${household.id}/members`, {
+              body: { ...form, role: hasOwner ? "approver" : "elder" },
+            }),
+          );
+          setForm({ email: "", display_name: "" });
+          void refreshHouseholds();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Couldn't send the invite.");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <p className="sub" style={{ margin: "0 0 12px" }}>
+        {hasOwner
+          ? "Invite a family approver. They can't see anything until the account owner allows it here."
+          : "Invite the account owner. Once they join, they decide what you can see and do."}
+      </p>
+      <label className="fl">
+        <span>Their name</span>
+        <input required maxLength={120} value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
+      </label>
+      <label className="fl">
+        <span>Their email</span>
+        <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <span className="hint">Used only to send this invite.</span>
+      </label>
+      <button className="bt g" type="submit" disabled={busy}>
+        {busy ? "Sending…" : "Send invite"}
+      </button>
+      {result &&
+        (result.emailed ? (
+          <p className="foot ok-t">Invite emailed to {result.member.email}.</p>
+        ) : (
+          <p className="foot">
+            Email isn&apos;t set up on this server — send this link yourself:{" "}
+            <span style={{ userSelect: "all", wordBreak: "break-all", color: "var(--ink)" }}>{result.invite_link}</span>
+          </p>
+        ))}
+      {error && (
+        <p className="foot bad-t" role="alert">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }
 

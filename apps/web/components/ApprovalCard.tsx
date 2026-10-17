@@ -102,6 +102,12 @@ export function ApprovalCard({
             <dd>{p.reference}</dd>
           </>
         )}
+        {approval.action_type === "bill_payment" && (
+          <>
+            <dt>Warden fee</dt>
+            <dd>None — the payee gets the amount shown</dd>
+          </>
+        )}
       </dl>
 
       {r?.status === "succeeded" && (

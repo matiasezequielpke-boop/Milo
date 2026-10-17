@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     # Public URL of the web app — used to build invite links in emails.
     web_app_url: str = "http://localhost:3000"
+    # Public URL of this API — enables one-click unsubscribe headers in emails.
+    public_api_url: str | None = None
 
     database_url: str = "postgresql://milo:milo@localhost:5432/milo"
     redis_url: str = "redis://localhost:6379/0"
@@ -28,6 +30,24 @@ class Settings(BaseSettings):
     # verify a user's access token; nothing here can mint one.
     supabase_url: str | None = None
     supabase_anon_key: str | None = None
+    # Server-only. Lets sign-up create an already-confirmed account (so a new
+    # user is in straight away) and lets account deletion remove the
+    # Supabase user too. Never sent to the browser.
+    supabase_service_role_key: str | None = None
+    # Two-step login: the password check opens a window this long for the
+    # emailed code; then the person starts again.
+    login_challenge_minutes: int = 10
+    login_max_failures: int = 5  # per email, per 15 minutes
+    login_max_codes: int = 3  # emails per password check
+
+    # Version of the Terms/Privacy text a new account agrees to. Bump it
+    # (and apps/web/lib/legal.ts) whenever those pages change materially.
+    legal_version: str = "2026-10-17"
+    # Business details shown in email footers and on the legal pages.
+    # Empty until the company is incorporated — nothing is made up.
+    business_name: str = "Warden"
+    business_address: str | None = None
+    contact_email: str | None = None
 
     # Local-only escape hatch so the full flow can be exercised without a
     # reachable Supabase project: accepts `Authorization: Bearer dev:<email>`.
@@ -36,7 +56,7 @@ class Settings(BaseSettings):
 
     # Demo mode: the app runs without sign-in. Requests act as one of two
     # fixed demo people (`Authorization: Bearer demo:<email>`) — the account
-    # owner and her family approver — so the whole family flow can be shown
+    # owner and their family approver — so the whole family flow can be shown
     # from one browser. Never combined with anything that can move real
     # money: app/main.py refuses to start if it is.
     demo_mode: bool = False

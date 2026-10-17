@@ -127,3 +127,13 @@ export const IconWarn = () => (
     <path d="M12 9v4M12 17h.01" />
   </Icon>
 );
+export const IconLogout = () => (
+  <Icon>
+    <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11" />
+  </Icon>
+);
+export const IconDownload = () => (
+  <Icon>
+    <path d="M12 3v12M7 10l5 5 5-5M4 21h16" />
+  </Icon>
+);

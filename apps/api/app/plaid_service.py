@@ -29,6 +29,7 @@ from plaid.model.accounts_get_request import AccountsGetRequest
 from plaid.model.country_code import CountryCode
 from plaid.model.custom_sandbox_transaction import CustomSandboxTransaction
 from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
+from plaid.model.item_remove_request import ItemRemoveRequest
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
 from plaid.model.link_token_transactions import LinkTokenTransactions
@@ -253,6 +254,13 @@ async def connect_item(
         detail={"institution": institution_name, "owner": owner.display_name},
     )
     return connection
+
+
+async def remove_item(access_token: str) -> None:
+    """Ends Warden's access to that bank login at Plaid (/item/remove), so
+    the access token stops working everywhere — used when an account owner
+    deletes their account."""
+    await _call(_client().item_remove, ItemRemoveRequest(access_token=access_token))
 
 
 async def access_token_for(db: AsyncSession, connection: BankConnection) -> str:

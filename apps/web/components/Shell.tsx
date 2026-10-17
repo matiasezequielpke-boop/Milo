@@ -10,7 +10,9 @@ import {
   IconApprovals,
   IconChats,
   IconFamily,
+  IconLogout,
   IconMenu,
+  IconModel,
   IconMoney,
   IconMoon,
   IconMore,
@@ -20,6 +22,7 @@ import {
   IconSwap,
 } from "@/components/icons";
 import { AgentSheet } from "@/components/AgentSheet";
+import { LegalLinks } from "@/components/Legal";
 import { Toy } from "@/components/Toy";
 import { CAST } from "@/lib/agents";
 import { useActiveHousehold, useApp } from "@/lib/store";
@@ -31,6 +34,7 @@ const NAV = [
   { href: "/money", label: "Money", icon: IconMoney },
   { href: "/family", label: "Family", icon: IconFamily },
   { href: "/activity", label: "Activity", icon: IconActivity },
+  { href: "/settings", label: "Settings", icon: IconModel },
 ];
 
 const SEG = [
@@ -152,7 +156,29 @@ export function Shell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setDark(document.documentElement.getAttribute("data-theme") !== "light");
+    // lib/api.ts announces a session that ended (expired, signed out elsewhere).
+    const ended = () => void useApp.getState().signOut();
+    window.addEventListener("warden:signed-out", ended);
+    return () => window.removeEventListener("warden:signed-out", ended);
   }, []);
+
+  // Nobody signed in → log in; signed in with no household yet → set-up.
+  useEffect(() => {
+    if (app.status === "signed-out") router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    if (app.status === "ready" && app.mode === "user" && app.households.length === 0) router.replace("/onboarding");
+  }, [app.status, app.mode, app.households.length, pathname, router]);
+
+  // The mobile drawer is off-screen when closed; keep it out of the tab order too.
+  const sideRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 880px)");
+    const apply = () => {
+      if (sideRef.current) sideRef.current.inert = mq.matches && !menu;
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [menu]);
 
   // Close transient surfaces on navigation.
   useEffect(() => {
@@ -226,8 +252,10 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const counts = { pendingApprovals: app.pendingApprovals, openAlerts: app.openAlerts };
   const ready = app.status === "ready";
+  const demo = app.mode === "demo";
   const me = app.people.find((p) => p.email === app.me?.email);
-  const other = app.people.find((p) => p.email !== app.me?.email);
+  const other = demo ? app.people.find((p) => p.email !== app.me?.email) : undefined;
+  const myName = household?.members.find((m) => m.is_me)?.display_name || app.me?.display_name || app.me?.email || "";
   const canApprove = Boolean(household?.my_scopes.includes("approve_actions"));
   const needle = q.trim().toLowerCase();
   const match = (s: string) => !needle || s.toLowerCase().includes(needle);
@@ -245,19 +273,24 @@ export function Shell({ children }: { children: ReactNode }) {
         <i className="b4" />
       </div>
 
+      <a className="skip" href="#pane">
+        Skip to content
+      </a>
       <div className="shell">
-        <aside className={`side glass ${menu ? "on" : ""}`} aria-label="Sidebar">
+        <aside ref={sideRef} className={`side glass ${menu ? "on" : ""}`} aria-label="Sidebar">
           <div className="brand">
             <Toy kind="beacon" className="logo" />
             <div>
               <b>
                 Milo
-                <span
-                  className="demoBadge"
-                  title="Demo: no sign-in, a test bank (Plaid sandbox) and test payments (Stripe test mode). Replies come from the live model, not a script."
-                >
-                  Demo
-                </span>
+                {demo && (
+                  <span
+                    className="demoBadge"
+                    title="Demo family: a test bank (Plaid sandbox) and test payments (Stripe test mode). Replies come from the live model, not a script."
+                  >
+                    Demo
+                  </span>
+                )}
               </b>
               <span className="tag">The trust layer for your money</span>
             </div>
@@ -338,27 +371,50 @@ export function Shell({ children }: { children: ReactNode }) {
             )}
           </div>
 
+          <LegalLinks />
           <div style={{ position: "relative" }}>
-            <div className={`pop glass deep up ${people ? "on" : ""}`} role="menu" aria-label="View as">
-              <div className="ph">Demo · view as</div>
-              {app.people.map((p) => (
-                <button
-                  key={p.email}
-                  role="menuitemradio"
-                  aria-checked={p.email === app.me?.email}
-                  className={`pi ${p.email === app.me?.email ? "on" : ""}`}
-                  onClick={() => {
-                    setPeople(false);
-                    void app.switchPerson(p.email);
-                  }}
-                >
-                  <span className="av">{p.name[0]}</span>
-                  <span className="nm">
-                    <b>{p.name}</b>
-                    <span>{ROLE_LABEL[p.role]}</span>
-                  </span>
-                </button>
-              ))}
+            <div className={`pop glass deep up ${people ? "on" : ""}`} role="menu" aria-label={demo ? "View as" : "Account"}>
+              {demo ? (
+                <>
+                  <div className="ph">Demo · view as</div>
+                  {app.people.map((p) => (
+                    <button
+                      key={p.email}
+                      role="menuitemradio"
+                      aria-checked={p.email === app.me?.email}
+                      className={`pi ${p.email === app.me?.email ? "on" : ""}`}
+                      onClick={() => {
+                        setPeople(false);
+                        void app.switchPerson(p.email);
+                      }}
+                    >
+                      <span className="av">{p.name[0]}</span>
+                      <span className="nm">
+                        <b>{p.name}</b>
+                        <span>{ROLE_LABEL[p.role]}</span>
+                      </span>
+                    </button>
+                  ))}
+                  <hr />
+                </>
+              ) : (
+                <Link className="pi" role="menuitem" href="/settings">
+                  <IconModel />
+                  Settings
+                </Link>
+              )}
+              <button
+                className="pi"
+                role="menuitem"
+                onClick={async () => {
+                  setPeople(false);
+                  await app.signOut();
+                  router.replace("/login");
+                }}
+              >
+                <IconLogout />
+                {demo ? "Leave the demo" : "Log out"}
+              </button>
             </div>
             <button
               className="me"
@@ -369,10 +425,20 @@ export function Shell({ children }: { children: ReactNode }) {
               disabled={!ready}
               style={!ready ? { opacity: 1, cursor: "default" } : undefined}
             >
-              <span className="av">{me ? me.name[0] : <PersonGlyph />}</span>
+              <span className="av">{ready && myName ? myName[0].toUpperCase() : <PersonGlyph />}</span>
               <span className="nm">
-                <b>{me ? `Viewing as ${me.name}` : "Demo family"}</b>
-                <span>{me ? ROLE_LABEL[me.role] : ready ? "" : app.status === "loading" ? "Connecting…" : "Not connected"}</span>
+                <b>{!ready ? "Warden" : demo && me ? `Viewing as ${me.name}` : myName}</b>
+                <span>
+                  {!ready
+                    ? app.status === "loading"
+                      ? "Connecting…"
+                      : "Not connected"
+                    : demo && me
+                      ? ROLE_LABEL[me.role]
+                      : household
+                        ? ROLE_LABEL[household.my_role]
+                        : app.me?.email}
+                </span>
               </span>
               {ready && <IconSwap />}
             </button>

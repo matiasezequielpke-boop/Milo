@@ -54,9 +54,9 @@ class User(Base):
     """Mirrors auth.users, one row per Supabase-authenticated account.
 
     No password field — Supabase Auth owns credentials entirely (see
-    app/supabase_auth.py). This row is created automatically by the
-    on_auth_user_created trigger the moment someone verifies their
-    email OTP; this app only ever reads it, never inserts into it.
+    app/supabase_auth.py). The id is the Supabase user id; the row is made
+    at sign-up or first login (app/routers/auth.py), or earlier by the
+    on_auth_user_created trigger where that exists.
     """
 
     __tablename__ = "users"
@@ -65,8 +65,47 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # What the person agreed to at sign-up, and when (consent records).
+    terms_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    age_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set when they turn notification emails off (unsubscribe link or
+    # Settings). Sign-in codes still go out: those are the login itself.
+    email_opt_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     conversations: Mapped[list["Conversation"]] = relationship(back_populates="user")
+
+
+class AuthSession(Base):
+    """A Supabase session this API accepts. A Supabase access token alone
+    isn't enough: its `session_id` must be here, which only happens after
+    sign-up or after both login steps (password, then emailed code). A
+    session obtained any other way — straight from Supabase with just a
+    password, or just an emailed link — is rejected."""
+
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)  # Supabase session_id
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    method: Mapped[str] = mapped_column(String(20), nullable=False)  # "signup" | "login"
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class LoginChallenge(Base):
+    """One password check. Failed ones count toward the rate limit; a
+    successful one opens a short window to enter the emailed code."""
+
+    __tablename__ = "login_challenges"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    password_ok: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    codes_sent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    code_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Conversation(Base):
@@ -180,7 +219,9 @@ class ApprovalRequest(Base):
     __tablename__ = "approval_requests"
 
     id: Mapped[uuid.UUID] = _uuid_pk()
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # Who asked. Kept nullable so the household's record of a request
+    # survives the requester deleting their account.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True
     )

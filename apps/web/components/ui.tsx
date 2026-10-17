@@ -52,9 +52,9 @@ const STATUS_COPY: Record<Exclude<Status, "ready">, { title: string; body: React
     title: "Can't reach Warden right now",
     body: "The API didn't answer. Try again in a moment.",
   },
-  "no-demo": {
-    title: "Sign-in is off in this build",
-    body: "The API isn't running in demo mode (DEMO_MODE), so there's no one to view as.",
+  "signed-out": {
+    title: "Taking you to log in…",
+    body: null,
   },
 };
 

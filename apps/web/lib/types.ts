@@ -51,6 +51,16 @@ export type Integrations = {
   push: boolean;
   dev_auth: boolean;
   demo_mode: boolean;
+  auth: boolean;
+  account_deletion: boolean;
+  legal_version: string;
+};
+
+export type SessionResponse = {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+  user: Me;
 };
 
 export type DemoPerson = { email: string; name: string; role: Role; token: string };
@@ -61,7 +71,13 @@ export type DemoBootstrap = {
   people: DemoPerson[];
 };
 
-export type Me = { id: string; email: string; display_name: string | null };
+export type Me = {
+  id: string;
+  email: string;
+  display_name: string | null;
+  email_opt_out_at: string | null;
+  terms_version: string | null;
+};
 
 export type Approval = {
   id: string;

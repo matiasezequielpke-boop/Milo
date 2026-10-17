@@ -24,7 +24,7 @@ Nothing answers with scripted text and nothing fakes a provider: with a key miss
 ```bash
 docker compose up -d                       # postgres (pgvector) + redis
 cd apps/api
-cp ../../.env.example .env                 # set DEMO_MODE=true to use the app without sign-in
+cp ../../.env.example .env                 # Supabase keys for real accounts, or DEMO_MODE=true for the demo family
 pip install -r requirements-dev.txt
 alembic upgrade head
 uvicorn app.main:app --reload
@@ -33,7 +33,9 @@ pytest                                     # uses the milo_test database
 cd ../web && npm install && npm run dev    # NEXT_PUBLIC_API_URL defaults to http://localhost:8000 in dev only
 ```
 
-**Sign-in is switched off for now.** With `DEMO_MODE=true` the API serves a ready-made family — Rosa (account owner) and Ana (Rosa's approver) — and the web app lets you switch between them from the sidebar. Demo mode refuses to start with live payments, live Stripe keys or Plaid production. A production web build with no `NEXT_PUBLIC_API_URL` shows an honest "API not connected" state and never calls localhost. The Supabase OTP sign-in is still supported by the API for when it comes back.
+**Accounts.** Sign up with email + password (18+, Terms and Privacy accepted) and you're in. Logging in takes the password and then a code Supabase emails you. The API runs both flows in front of Supabase and refuses any session that skipped a step. Setup steps, including the Supabase email template and SMTP: [`docs/auth-setup.md`](docs/auth-setup.md). With `DEMO_MODE=true` the login page also offers a ready-made demo family (Rosa, the account owner, and Ana, Rosa's approver); demo mode refuses to start with live payments, live Stripe keys or Plaid production. A production web build with no `NEXT_PUBLIC_API_URL` shows an honest "API not connected" state and never calls localhost.
+
+**Privacy and compliance.** Privacy, Terms, Cookies, Refunds and Licenses pages; data export and account deletion in Settings; unsubscribe links in every notification email; and the rest of the checklist in [`docs/compliance.md`](docs/compliance.md). Third-party licenses: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ### The end-to-end demo (needs Plaid sandbox, Stripe test, and Anthropic keys)
 

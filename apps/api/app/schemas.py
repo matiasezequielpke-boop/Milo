@@ -11,15 +11,63 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 # --- Auth ---
-# No RegisterRequest/LoginRequest/TokenResponse here anymore — Supabase
-# Auth issues tokens directly to the frontend. This backend only ever
-# reads a user back out (see app/deps.py, app/supabase_auth.py).
+# Supabase Auth checks passwords and emails the sign-in codes; these are
+# the requests to this API's gate in front of it (app/routers/auth.py).
 
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
     display_name: str | None
     created_at: datetime
+    email_opt_out_at: datetime | None = None
+    terms_version: str | None = None
+
+
+class SignupRequest(BaseModel):
+    email: EmailStr
+    # 8+ per NIST SP 800-63B; 72 is bcrypt's limit (Supabase hashes with it).
+    password: str = Field(min_length=8, max_length=72)
+    accept_terms: bool
+    confirm_age: bool
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=72)
+
+
+class LoginVerifyRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(pattern=r"^\d{6,10}$")
+
+
+class EmailOnlyRequest(BaseModel):
+    email: EmailStr
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=10, max_length=2000)
+
+
+class LoginStartResponse(BaseModel):
+    status: Literal["code_sent"] = "code_sent"
+    expires_in_seconds: int
+
+
+class SessionResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    expires_at: int
+    user: UserResponse
+
+
+class NotificationSettings(BaseModel):
+    email_notifications: bool
+
+
+class AccountDeleteRequest(BaseModel):
+    # Typed by the person; an accident-proof confirmation, not a hurdle.
+    confirm: Literal["DELETE"]
 
 
 # --- Waitlist ---

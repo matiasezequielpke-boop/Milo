@@ -4,19 +4,20 @@ import { create } from "zustand";
 
 import type { ToyKind } from "@/components/Toy";
 import { api, API_URL, ApiError } from "@/lib/api";
-import { getDemoEmail, setDemoEmail } from "@/lib/auth";
+import { getDemoEmail, getSession, setDemoEmail, setSession, type Session } from "@/lib/auth";
 import type { Alert, Approval, Conversation, DemoBootstrap, DemoPerson, Household, Integrations, Me } from "@/lib/types";
 
 // offline     — this site has no API configured (NEXT_PUBLIC_API_URL unset)
 // unreachable — an API is configured but didn't answer
-// no-demo     — the API answered but isn't running in DEMO_MODE, and
-//               sign-in is switched off in this build
-export type Status = "loading" | "offline" | "unreachable" | "no-demo" | "ready";
+// signed-out  — nobody is logged in (and the demo isn't being explored)
+export type Status = "loading" | "offline" | "unreachable" | "signed-out" | "ready";
+export type Mode = "user" | "demo";
 
 type Toast = { id: number; text: string; kind: ToyKind };
 
 type State = {
   status: Status;
+  mode: Mode;
   error: string | null;
   people: DemoPerson[];
   me: Me | null;
@@ -31,6 +32,9 @@ type State = {
   toast: Toast | null;
   sheet: string | null;
   load: () => Promise<void>;
+  signIn: (session: Session) => Promise<void>;
+  signOut: () => Promise<void>;
+  enterDemo: () => Promise<void>;
   switchPerson: (email: string) => Promise<void>;
   refreshHouseholds: () => Promise<void>;
   refreshCounts: () => Promise<void>;
@@ -54,8 +58,29 @@ export const useApp = create<State>((set, get) => {
     set({ status: "ready", error: null });
   }
 
+  const signedOut = {
+    status: "signed-out" as const,
+    me: null,
+    people: [],
+    households: [],
+    activeId: null,
+    conversations: [],
+    activeConversation: null,
+    pendingApprovals: 0,
+    openAlerts: 0,
+  };
+
+  async function demoBootstrap() {
+    const boot = await api<DemoBootstrap>("/demo/bootstrap", { method: "POST" });
+    const saved = getDemoEmail();
+    const person = boot.people.find((p) => p.email === saved) ?? boot.people[0];
+    setDemoEmail(person.email);
+    set({ people: boot.people, mode: "demo" });
+  }
+
   return {
     status: "loading",
+    mode: "user",
     error: null,
     people: [],
     me: null,
@@ -75,22 +100,48 @@ export const useApp = create<State>((set, get) => {
         set({ status: "offline" });
         return;
       }
+      let integrations: Integrations;
       try {
-        const integrations = await api<Integrations>("/integrations");
+        integrations = await api<Integrations>("/integrations");
         set({ integrations });
-        if (!integrations.demo_mode) {
-          set({ status: "no-demo" });
-          return;
-        }
-        const boot = await api<DemoBootstrap>("/demo/bootstrap", { method: "POST" });
-        const saved = getDemoEmail();
-        const person = boot.people.find((p) => p.email === saved) ?? boot.people[0];
-        setDemoEmail(person.email);
-        set({ people: boot.people });
-        await enter();
       } catch (e) {
-        set({ status: "unreachable", error: e instanceof ApiError || e instanceof Error ? e.message : null });
+        set({ status: "unreachable", error: e instanceof Error ? e.message : null });
+        return;
       }
+      try {
+        if (getSession()) {
+          set({ mode: "user" });
+          await enter();
+        } else if (getDemoEmail() && integrations.demo_mode) {
+          await demoBootstrap();
+          await enter();
+        } else {
+          setDemoEmail(null);
+          set(signedOut);
+        }
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) set(signedOut);
+        else set({ status: "unreachable", error: e instanceof Error ? e.message : null });
+      }
+    },
+
+    signIn: async (session) => {
+      setSession(session);
+      set({ mode: "user", status: "loading" });
+      await get().load();
+    },
+
+    signOut: async () => {
+      if (getSession()) await api("/auth/logout", { method: "POST" }).catch(() => undefined);
+      setSession(null);
+      setDemoEmail(null);
+      set({ ...signedOut, mode: "user" });
+    },
+
+    enterDemo: async () => {
+      setSession(null);
+      await demoBootstrap();
+      await enter();
     },
 
     switchPerson: async (email) => {

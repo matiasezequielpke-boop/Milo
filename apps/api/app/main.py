@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.agents.definitions import AGENTS
 from app.config import get_settings
 from app.routers import (
+    account,
     approvals,
     auth,
     banking,
@@ -61,6 +62,7 @@ app.include_router(monitors.router)
 app.include_router(households.router)
 app.include_router(banking.router)
 app.include_router(demo.router)
+app.include_router(account.router)
 
 
 @app.get("/health")
@@ -87,6 +89,14 @@ async def integrations():
         "push": bool(settings.ntfy_topic),
         "dev_auth": settings.dev_auth_enabled and settings.app_env == "development",
         "demo_mode": settings.demo_mode,
+        "auth": bool(settings.supabase_url and settings.supabase_anon_key),
+        "account_deletion": bool(settings.supabase_service_role_key),
+        "legal_version": settings.legal_version,
+        "business": {
+            "name": settings.business_name,
+            "address": settings.business_address,
+            "contact_email": settings.contact_email,
+        },
     }
 
 

@@ -224,7 +224,9 @@ export default function ChatPage() {
           ? { tone: "warn", text: "Chat is off: can't reach Warden's API right now." }
           : !modelReady
             ? { tone: "warn", text: "The model isn't connected on this server yet, so Milo can't reply. Nothing here is scripted." }
-            : { tone: "info", text: "Live AI replies. Test bank and test payments only — no real money moves." };
+            : integrations?.stripe_mode === "live"
+              ? { tone: "info", text: "Live AI replies. AI can make mistakes — check before you approve." }
+              : { tone: "info", text: "Live AI replies — AI can make mistakes. Payments run in test mode: no real money moves." };
 
   const placeholder = !canSend
     ? "Chat is off for now"

@@ -68,12 +68,12 @@ def auth(email: str) -> dict:
 
 
 ANA = "ana@example.com"      # the adult child — approver
-ROSA = "rosa@example.com"    # her mother — the account owner
+ROSA = "rosa@example.com"    # Ana's mother — the account owner
 
 
 @pytest.fixture
 async def family(client):
-    """Ana sets Warden up for her mother Rosa; Rosa joins and consents."""
+    """Ana sets Warden up for Rosa (Ana's mother); Rosa joins and consents."""
     r = await client.post(
         "/households",
         json={
