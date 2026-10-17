@@ -26,6 +26,8 @@ Leave `DEMO_MODE` off for real accounts. If it's on, the login page also offers 
 
 ### 2. Supabase dashboard (one time)
 
+**The login code email.** With `RESEND_API_KEY` set on the API (the production setup), Warden emails the code itself: Supabase only generates it (admin `generate_link`, which sends nothing), so Supabase's email templates and SMTP aren't involved, and items 1 and 4 below don't apply. Resend's test sender (`EMAIL_FROM=Warden <onboarding@resend.dev>`) only delivers to the Resend account's own address; verify a domain at Resend before inviting anyone else. Without `RESEND_API_KEY`, Supabase sends the code as described below. Note that Supabase only lets you edit its templates once custom SMTP is set up.
+
 1. **Authentication → Emails → "Magic Link" template:** include the code, e.g.
    ```html
    <h2>Your Warden sign-in code</h2>

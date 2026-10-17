@@ -27,7 +27,8 @@ Both Vercel projects build from `matiasezequielpke-boop/Milo` with root director
 | `ANTHROPIC_API_KEY` | **owner** | The agent's model |
 | `PLAID_CLIENT_ID`, `PLAID_SECRET` | **owner** | Sandbox keys; `PLAID_ENV=sandbox` is the default |
 | `STRIPE_SECRET_KEY` | **owner** | `sk_test_…` only. Live keys are refused unless `PAYMENTS_LIVE_ENABLED` is set after legal review |
-| `RESEND_API_KEY`, `EMAIL_FROM` | owner, optional | Approval and alert emails |
+| `RESEND_API_KEY` | **owner** | Resend. Sends the login code (Warden emails it itself; see auth-setup.md) and the approval/alert emails |
+| `EMAIL_FROM` | deploy | `Warden <onboarding@resend.dev>`: Resend's test sender, which only delivers to the Resend account's own address. Change it to an address on a verified domain before real users |
 
 Connecting Supabase's Vercel integration to `warden-api` (Vercel → Storage) provides `POSTGRES_URL` and `SUPABASE_SERVICE_ROLE_KEY` without copying them by hand. A change to environment variables applies from the next deployment.
 

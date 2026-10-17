@@ -140,6 +140,38 @@ async def send_email(
     return True
 
 
+async def send_login_code(to: str, code: str) -> None:
+    """Step 2 of logging in. Always sent (no opt-out: it's how the person
+    gets in). Raises if it can't be sent, so the login says so."""
+    settings = get_settings()
+    minutes = settings.login_challenge_minutes
+    body = (
+        f"Your Warden sign-in code is {code}\n"
+        f"Enter it on the login page to finish signing in. It expires in {minutes} minutes.\n"
+        "If you didn't try to log in, ignore this email. Your password alone can't get anyone in."
+    )
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.post(
+            RESEND_URL,
+            headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+            json={
+                "from": settings.email_from,
+                "to": [to],
+                "subject": "Your Warden sign-in code",
+                "text": body,
+                "html": (
+                    '<div style="font-family:system-ui,sans-serif;font-size:16px;line-height:1.5;color:#1a1410">'
+                    f"<p>Your Warden sign-in code is</p>"
+                    f'<p style="font-size:30px;font-weight:700;letter-spacing:6px">{html.escape(code)}</p>'
+                    f"<p>Enter it on the login page to finish signing in. It expires in {minutes} minutes.</p>"
+                    '<p style="font-size:13px;color:#555">If you didn\'t try to log in, ignore this email. '
+                    "Your password alone can't get anyone in.</p></div>"
+                ),
+            },
+        )
+        response.raise_for_status()
+
+
 async def _recipients(emails: list[str]) -> list[tuple[str, uuid.UUID | None]]:
     """Drops people who turned notification emails off; returns the rest
     with their user id (None for someone without an account yet, e.g. an

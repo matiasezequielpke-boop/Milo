@@ -77,6 +77,12 @@ class FakeGoTrue:
                 self.codes[body["email"]] = "246810"
                 self.codes_sent += 1
             return httpx.Response(200, json={})
+        if path == "/admin/generate_link" and request.method == "POST":
+            assert body["type"] == "magiclink" and request.headers["apikey"] == "service"
+            if body["email"] not in self.users:
+                return httpx.Response(404, json={"msg": "User not found"})
+            self.codes[body["email"]] = "135790"
+            return httpx.Response(200, json={**self.users[body["email"]], "email_otp": "135790", "verification_type": "magiclink"})
         if path == "/verify":
             if self.codes.get(body["email"]) != body["token"]:
                 return httpx.Response(403, json={"msg": "Token has expired or is invalid"})
@@ -103,6 +109,7 @@ def gotrue(monkeypatch):
     with respx.mock(assert_all_called=False) as router:
         router.route(host="proj.supabase.co").mock(side_effect=fake.handler)
         router.route(host="test").pass_through()
+        fake.router = router  # for tests that also fake the email provider
         yield fake
 
 
@@ -223,3 +230,40 @@ async def test_deleting_the_account_removes_the_supabase_user(client, gotrue):
     assert r.status_code == 200, r.text
     assert gotrue.deleted == [session["user"]["id"]]
     assert (await client.get("/auth/me", headers=bearer(session["access_token"]))).status_code == 401
+
+
+async def test_with_an_email_provider_warden_sends_the_code_itself(client, gotrue, monkeypatch):
+    """Supabase only generates the code (no template, no SMTP involved);
+    the email goes out through Resend and the code works the same way."""
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    monkeypatch.setenv("EMAIL_FROM", "Warden <onboarding@resend.dev>")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    sent = []
+    gotrue.router.post("https://api.resend.com/emails").mock(
+        side_effect=lambda request: sent.append(json.loads(request.content)) or httpx.Response(200, json={"id": "em_1"})
+    )
+    await _signup(client)
+    r = await client.post("/auth/login", json={"email": SIGNUP["email"], "password": SIGNUP["password"]})
+    assert r.status_code == 200, r.text
+    assert gotrue.codes_sent == 0  # Supabase sent nothing
+    [email] = sent
+    assert email["to"] == [SIGNUP["email"]] and email["from"] == "Warden <onboarding@resend.dev>"
+    assert "135790" in email["text"] and email["subject"] == "Your Warden sign-in code"
+
+    ok = await client.post("/auth/login/verify", json={"email": SIGNUP["email"], "code": "135790"})
+    assert ok.status_code == 200, ok.text
+
+
+async def test_a_refused_code_email_is_explained(client, gotrue, monkeypatch):
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    gotrue.router.post("https://api.resend.com/emails").mock(
+        return_value=httpx.Response(403, json={"message": "You can only send testing emails to your own email address"})
+    )
+    await _signup(client)
+    r = await client.post("/auth/login", json={"email": SIGNUP["email"], "password": SIGNUP["password"]})
+    assert r.status_code == 502 and "test mode" in r.json()["detail"]

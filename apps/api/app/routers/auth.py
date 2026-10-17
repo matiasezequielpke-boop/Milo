@@ -18,12 +18,13 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import audit, supabase_auth
+from app import audit, notify, supabase_auth
 from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
@@ -184,10 +185,30 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> Login
     await db.commit()
 
     try:
-        await supabase_auth.send_email_code(email)
+        await _send_code(email)
     except SupabaseAuthError as exc:
         raise _upstream(exc, "Couldn't send the code right now. Try again in a minute.") from exc
     return LoginStartResponse(expires_in_seconds=settings.login_challenge_minutes * 60)
+
+
+async def _send_code(email: str) -> None:
+    """With an email provider (RESEND_API_KEY), Warden emails the code
+    itself, so nothing depends on the Supabase project's email templates
+    or SMTP; otherwise Supabase sends it."""
+    if not get_settings().resend_api_key:
+        await supabase_auth.send_email_code(email)
+        return
+    code = await supabase_auth.generate_email_code(email)
+    try:
+        await notify.send_login_code(email, code)
+    except httpx.HTTPStatusError as exc:
+        logger.warning("login code email refused: %s %s", exc.response.status_code, exc.response.text[:300])
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Couldn't email the code. If the email service is still in test mode, it only delivers to its own account's address.",
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Couldn't email the code right now. Try again in a minute.") from exc
 
 
 async def _open_challenge(db: AsyncSession, email: str) -> LoginChallenge:
@@ -221,7 +242,7 @@ async def resend_code(body: EmailOnlyRequest, db: AsyncSession = Depends(get_db)
     challenge.codes_sent += 1
     await db.commit()
     try:
-        await supabase_auth.send_email_code(email)
+        await _send_code(email)
     except SupabaseAuthNotConfiguredError as exc:
         raise _not_configured() from exc
     except SupabaseAuthError as exc:

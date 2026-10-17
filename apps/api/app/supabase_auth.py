@@ -126,6 +126,17 @@ async def send_email_code(email: str) -> None:
     await _post("/otp", {"email": email, "create_user": False})
 
 
+async def generate_email_code(email: str) -> str:
+    """A one-time code for an existing account, made by Supabase without
+    sending anything (admin generate_link), for Warden to email itself.
+    It's verified exactly like an emailed one (`verify_email_code`)."""
+    link = await _post("/admin/generate_link", {"type": "magiclink", "email": email}, service=True)
+    code = link.get("email_otp") or (link.get("properties") or {}).get("email_otp")
+    if not code:
+        raise SupabaseAuthError(502, "Supabase didn't return a sign-in code.")
+    return code
+
+
 async def verify_email_code(email: str, code: str) -> dict:
     return await _post("/verify", {"type": "email", "email": email, "token": code})
 
