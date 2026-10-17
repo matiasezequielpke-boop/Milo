@@ -1,31 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { Page } from "@/components/Page";
 import { useHouseholdData } from "@/components/useHouseholdData";
-import { Badge, Button, Card, Empty, Notice, PageTitle, Spinner } from "@/components/ui";
+import { Chip, Empty, Notice, Ready, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import { day, money } from "@/lib/format";
-import { useApp } from "@/lib/store";
+import { useActiveHousehold, useApp } from "@/lib/store";
 import type { Alert } from "@/lib/types";
 
-const SEVERITY = { high: "red", medium: "amber", low: "neutral" } as const;
+const SEVERITY = {
+  high: { label: "Likely scam", tone: "bad" as const },
+  medium: { label: "Worth a look", tone: "wait" as const },
+  low: { label: "FYI", tone: undefined },
+};
 const RESOLVED: Record<string, string> = {
-  confirmed_legit: "Marked fine",
-  confirmed_fraud: "Marked fraud — payee blocked",
+  confirmed_legit: "Marked as fine",
+  confirmed_fraud: "Marked as fraud — Warden won't pay this payee",
   dismissed: "Dismissed",
 };
 
 function AlertCard({ alert, onDone }: { alert: Alert; onDone: () => void }) {
-  const household = useApp((s) => s.households.find((h) => h.id === s.activeId));
+  const household = useActiveHousehold();
+  const showToast = useApp((s) => s.showToast);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const sev = SEVERITY[alert.severity];
 
   async function resolve(resolution: string) {
     setBusy(resolution);
+    setError(null);
     try {
       await api(`/households/${household!.id}/alerts/${alert.id}/resolve`, { body: { resolution } });
+      showToast(RESOLVED[resolution] ?? "Saved", "star");
       onDone();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save that.");
@@ -35,49 +42,53 @@ function AlertCard({ alert, onDone }: { alert: Alert; onDone: () => void }) {
   }
 
   return (
-    <Card>
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <Badge tone={SEVERITY[alert.severity]}>{alert.severity === "high" ? "Likely scam" : alert.severity === "medium" ? "Worth a look" : "FYI"}</Badge>
-        <span className="text-sm text-white/40">{day(alert.created_at)}</span>
+    <div className="card glass">
+      <div className="top">
+        <Chip tone={sev.tone}>{sev.label}</Chip>
+        <span className="meta">{day(alert.created_at)}</span>
       </div>
-      <p className="text-lg font-medium text-white">{alert.title}</p>
+      <div className="ttl">{alert.title}</div>
       {alert.transaction && (
-        <p className="mt-1 text-white/55">
+        <div className="sub">
           {alert.transaction.name} · {money(alert.transaction.amount)} · {day(alert.transaction.date)}
-        </p>
+        </div>
       )}
-      <ul className="mt-3 list-disc space-y-1 pl-5 text-[0.95rem] text-white/75">
+      <ul className="why">
         {alert.reasons.map((r, i) => (
           <li key={i}>{r}</li>
         ))}
       </ul>
       {alert.status === "open" ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => resolve("confirmed_legit")} disabled={busy !== null}>
+        <div className="acts">
+          <button className="bt g sm" onClick={() => resolve("confirmed_legit")} disabled={busy !== null}>
             It&apos;s fine
-          </Button>
-          <Button variant="danger" onClick={() => resolve("confirmed_fraud")} disabled={busy !== null}>
+          </button>
+          <button className="bt x sm" onClick={() => resolve("confirmed_fraud")} disabled={busy !== null}>
             It&apos;s fraud
-          </Button>
-          <Button variant="ghost" onClick={() => resolve("dismissed")} disabled={busy !== null}>
+          </button>
+          <button className="bt g sm" onClick={() => resolve("dismissed")} disabled={busy !== null}>
             Dismiss
-          </Button>
+          </button>
         </div>
       ) : (
-        <p className="mt-3 text-sm text-white/50">{RESOLVED[alert.status]}</p>
+        <p className="foot">{RESOLVED[alert.status]}</p>
       )}
       {alert.status === "open" && alert.severity === "high" && (
-        <p className="mt-3 text-sm text-white/50">
-          If it&apos;s fraud, also call the bank using the number on the back of the card — they can stop the card and
-          dispute the charge.
+        <p className="foot">
+          If it&apos;s fraud, also call the bank on the number on the back of the card — they can stop the card and dispute the
+          charge.
         </p>
       )}
-      {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
-    </Card>
+      {error && (
+        <p className="foot bad-t" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
-export default function AlertsPage() {
+function Alerts() {
   const { data, loading, error, reload, household } = useHouseholdData<Alert[]>("alerts?status_filter=all", []);
   const refreshCounts = useApp((s) => s.refreshCounts);
   if (!household) return null;
@@ -87,29 +98,45 @@ export default function AlertsPage() {
     void reload();
     void refreshCounts();
   };
+  const elder = household.members.find((m) => m.role === "elder")?.display_name ?? "The account owner";
 
   return (
-    <Page>
-      <PageTitle title="Alerts" subtitle="Charges Warden thinks your family should look at, and why." />
-      {!household.my_scopes.includes("view_accounts") && (
-        <Notice>The account owner hasn&apos;t shared their accounts with you yet.</Notice>
-      )}
+    <>
+      <p className="lede">Charges Sentinel thinks the family should look at, and why.</p>
+      {!household.my_scopes.includes("view_accounts") && <Notice>{elder} hasn&apos;t shared their accounts with you yet.</Notice>}
       {loading && <Spinner />}
-      {error && <Notice tone="red">{error}</Notice>}
+      {error && <Notice tone="err">{error}</Notice>}
       {!loading && !error && (
-        <div className="space-y-4">
+        <>
+          <h3>Open · {open.length}</h3>
           {open.length === 0 && (
-            <Empty title="All clear" body="Warden checks every new charge after each bank sync. Nothing needs a look right now." />
+            <Empty
+              title="All clear"
+              body={<p style={{ margin: "4px 0 0" }}>Sentinel checks every new charge after each bank sync. Nothing needs a look right now.</p>}
+            />
           )}
           {open.map((a) => (
             <AlertCard key={a.id} alert={a} onDone={done} />
           ))}
-          {resolved.length > 0 && <h2 className="pt-6 text-sm uppercase tracking-wider text-white/45">Resolved</h2>}
+          {resolved.length > 0 && <h3>Resolved</h3>}
           {resolved.map((a) => (
             <AlertCard key={a.id} alert={a} onDone={done} />
           ))}
-        </div>
+        </>
       )}
-    </Page>
+    </>
+  );
+}
+
+export default function AlertsPage() {
+  const setCrumb = useApp((s) => s.setCrumb);
+  const open = useApp((s) => s.openAlerts);
+  useEffect(() => setCrumb("Alerts", open ? `${open} open` : undefined), [setCrumb, open]);
+  return (
+    <div className="panel">
+      <Ready>
+        <Alerts />
+      </Ready>
+    </div>
   );
 }

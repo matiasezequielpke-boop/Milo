@@ -1,9 +1,12 @@
 "use client";
 
-import { Page } from "@/components/Page";
+import { useEffect } from "react";
+
+import { Toy } from "@/components/Toy";
 import { useHouseholdData } from "@/components/useHouseholdData";
-import { Empty, Notice, PageTitle, ShieldIcon, Spinner } from "@/components/ui";
+import { Empty, Notice, Ready, Spinner } from "@/components/ui";
 import { when } from "@/lib/format";
+import { useApp } from "@/lib/store";
 import type { AuditEntry } from "@/lib/types";
 
 function describe(e: AuditEntry): string {
@@ -54,32 +57,49 @@ function describe(e: AuditEntry): string {
   }
 }
 
-export default function ActivityPage() {
+const AGENT_TOY = { warden: "lock", sentinel: "star", milo: "beacon" } as const;
+
+function Activity() {
   const { data, loading, error, household } = useHouseholdData<AuditEntry[]>("audit", []);
   if (!household) return null;
   return (
-    <Page>
-      <PageTitle title="Activity" subtitle="Everything Warden and your family did, in order. Nothing here can be edited or deleted." />
+    <>
+      <p className="lede">Everything Warden and the family did, in order. Nothing here can be edited or deleted.</p>
       {loading && <Spinner />}
-      {error && <Notice tone="red">{error}</Notice>}
+      {error && <Notice tone="err">{error}</Notice>}
       {!loading && !error && data.length === 0 && <Empty title="Nothing yet" />}
-      <ol className="space-y-1">
-        {data.map((e) => (
-          <li key={e.id} className="flex gap-4 rounded-xl px-3 py-3 hover:bg-white/[0.03]">
-            <span className="mt-1 text-white/35">
-              {e.agent_id === "warden" ? <ShieldIcon /> : <span className="block h-1.5 w-1.5 translate-y-1.5 rounded-full bg-white/40" />}
-            </span>
-            <div className="min-w-0">
-              <p className="text-white/90">{describe(e)}</p>
-              <p className="text-sm text-white/40">
-                {when(e.created_at)}
-                {e.actor && ` · ${e.actor}`}
-                {!e.actor && e.agent_id && ` · ${e.agent_id[0].toUpperCase()}${e.agent_id.slice(1)}`}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </Page>
+      {data.length > 0 && (
+        <ol className="tl card glass">
+          {data.map((e) => {
+            const kind = e.agent_id ? AGENT_TOY[e.agent_id as keyof typeof AGENT_TOY] : undefined;
+            return (
+              <li key={e.id}>
+                <span className="ic">{kind ? <Toy kind={kind} /> : <i />}</span>
+                <div>
+                  <p>{describe(e)}</p>
+                  <span>
+                    {when(e.created_at)}
+                    {e.actor && ` · ${e.actor}`}
+                    {!e.actor && e.agent_id && ` · ${e.agent_id[0].toUpperCase()}${e.agent_id.slice(1)}`}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </>
+  );
+}
+
+export default function ActivityPage() {
+  const setCrumb = useApp((s) => s.setCrumb);
+  useEffect(() => setCrumb("Activity"), [setCrumb]);
+  return (
+    <div className="panel">
+      <Ready>
+        <Activity />
+      </Ready>
+    </div>
   );
 }

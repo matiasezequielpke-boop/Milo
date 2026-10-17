@@ -1,15 +1,21 @@
 import { getToken } from "@/lib/auth";
 
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
+// No API configured → null, and the app says so instead of calling
+// localhost from a public page. In `next dev` it defaults to the local API.
+const configured = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "");
+export const API_URL: string | null = configured ? configured.replace(/\/$/, "") : null;
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
     super(message);
   }
 }
 
-async function headers(extra?: HeadersInit): Promise<HeadersInit> {
-  const token = await getToken();
+function headers(extra?: HeadersInit): HeadersInit {
+  const token = getToken();
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -26,10 +32,20 @@ function detail(body: unknown, fallback: string): string {
   return fallback;
 }
 
+async function send(path: string, init: RequestInit): Promise<Response> {
+  if (!API_URL) throw new ApiError(0, "Warden's API isn't connected to this site yet.");
+  try {
+    return await fetch(`${API_URL}${path}`, init);
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
+    throw new ApiError(0, "Can't reach Warden's API right now.");
+  }
+}
+
 export async function api<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await send(path, {
     method: init?.method || (init?.body !== undefined ? "POST" : "GET"),
-    headers: await headers(),
+    headers: headers(),
     body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
   if (res.status === 204) return undefined as T;
@@ -55,9 +71,9 @@ export async function streamChat(
   onEvent: (e: StreamEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(`${API_URL}/conversations/${conversationId}/messages`, {
+  const res = await send(`/conversations/${conversationId}/messages`, {
     method: "POST",
-    headers: await headers({ Accept: "text/event-stream" }),
+    headers: headers({ Accept: "text/event-stream" }),
     body: JSON.stringify({ content }),
     signal,
   });

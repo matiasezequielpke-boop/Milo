@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     # Refused at startup unless app_env == "development" (see app/main.py).
     dev_auth_enabled: bool = False
 
+    # Demo mode: the app runs without sign-in. Requests act as one of two
+    # fixed demo people (`Authorization: Bearer demo:<email>`) — the account
+    # owner and her family approver — so the whole family flow can be shown
+    # from one browser. Never combined with anything that can move real
+    # money: app/main.py refuses to start if it is.
+    demo_mode: bool = False
+    demo_owner_email: str = "rosa@demo.warden.app"
+    demo_approver_email: str = "ana@demo.warden.app"
+
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     google_api_key: str | None = None
@@ -78,6 +87,14 @@ class Settings(BaseSettings):
     vault_encryption_key: str | None = None
 
     ntfy_topic: str | None = None
+
+    @property
+    def demo_people(self) -> dict[str, tuple[str, str]]:
+        """email -> (display name, role) for the demo identities."""
+        return {
+            self.demo_owner_email.lower(): ("Rosa", "elder"),
+            self.demo_approver_email.lower(): ("Ana", "approver"),
+        }
 
     @property
     def cors_origin_list(self) -> list[str]:

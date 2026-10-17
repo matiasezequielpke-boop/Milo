@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { api } from "@/lib/api";
 import type { SyncResult } from "@/lib/types";
-import { Button } from "@/components/ui";
 
 type PlaidHandler = { open: () => void };
 declare global {
@@ -86,22 +85,26 @@ export function PlaidConnect({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={openLink} disabled={busy}>
+    <div>
+      <div className="acts" style={{ marginTop: 0 }}>
+        <button className="bt p" onClick={openLink} disabled={busy}>
           {busy ? "Connecting…" : "Connect a bank"}
-        </Button>
+        </button>
         {sandbox && (
-          <Button variant="secondary" onClick={sandboxConnect} disabled={busy}>
+          <button className="bt g" onClick={sandboxConnect} disabled={busy}>
             Use Plaid&apos;s test bank
-          </Button>
+          </button>
         )}
       </div>
-      <p className="text-sm text-white/45">
+      <p className="foot">
         Connections go through Plaid. Warden can read balances and transactions; it can&apos;t move money through this
         connection, and it never sees the bank password.
       </p>
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && (
+        <p className="foot bad-t" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

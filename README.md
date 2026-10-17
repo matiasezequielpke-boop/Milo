@@ -24,25 +24,24 @@ Nothing answers with scripted text and nothing fakes a provider: with a key miss
 ```bash
 docker compose up -d                       # postgres (pgvector) + redis
 cd apps/api
-cp ../../.env.example .env                 # set DEV_AUTH_ENABLED=true for local sign-in
+cp ../../.env.example .env                 # set DEMO_MODE=true to use the app without sign-in
 pip install -r requirements-dev.txt
 alembic upgrade head
-APP_ENV=development python -m scripts.dev_seed   # optional: a demo family with 3 months of history (not Plaid data)
 uvicorn app.main:app --reload
 pytest                                     # uses the milo_test database
 
-cd ../web && npm install && npm run dev    # NEXT_PUBLIC_API_URL defaults to http://localhost:8000
+cd ../web && npm install && npm run dev    # NEXT_PUBLIC_API_URL defaults to http://localhost:8000 in dev only
 ```
 
-With `DEV_AUTH_ENABLED=true` (development only), the login page offers a dev sign-in: use `ana@example.com` (approver) and `rosa@example.com` (account owner) after seeding.
+**Sign-in is switched off for now.** With `DEMO_MODE=true` the API serves a ready-made family — Rosa (account owner) and Ana (Rosa's approver) — and the web app lets you switch between them from the sidebar. Demo mode refuses to start with live payments, live Stripe keys or Plaid production. A production web build with no `NEXT_PUBLIC_API_URL` shows an honest "API not connected" state and never calls localhost. The Supabase OTP sign-in is still supported by the API for when it comes back.
 
 ### The end-to-end demo (needs Plaid sandbox, Stripe test, and Anthropic keys)
 
-1. Ana signs up and sets Warden up for her mother Rosa; Rosa accepts the invite and chooses what Ana may do.
+1. Viewing as Rosa, Family shows what Ana may do; Rosa can change it with one switch per permission.
 2. Money → "Use Plaid's test bank" connects a real Plaid sandbox Item and syncs it.
-3. Money → "Simulate a charge" adds `GIFT CARD MALL #3 — $500` at Plaid's sandbox bank; the sync raises a high-severity alert and emails Ana.
+3. Money → "Simulate a charge" adds `GIFT CARD MALL #3 — $500` at Plaid's sandbox bank; the sync raises a high-severity alert (and emails Ana when email is configured).
 4. Rosa asks Milo in chat: "please pay my ConEd bill, $88.20". Milo records it and Warden sends Ana an approval request.
-5. Ana approves; Stripe (test mode) settles the payment; the result appears in Rosa's chat and in the shared Activity log.
+5. Switch to Ana (sidebar, or "View as Ana" on the request) and approve; Stripe (test mode) settles the payment; the result appears in Rosa's chat and in the shared Activity log.
 
 ---
 

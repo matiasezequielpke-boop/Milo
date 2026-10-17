@@ -26,6 +26,8 @@ async def get_current_user(
 
     if credentials.credentials.startswith("dev:"):
         return await _dev_user(credentials.credentials.removeprefix("dev:"), db, unauthorized)
+    if credentials.credentials.startswith("demo:"):
+        return await _demo_user(credentials.credentials.removeprefix("demo:"), db, unauthorized)
 
     try:
         supabase_user = await verify_supabase_token(credentials.credentials)
@@ -73,6 +75,25 @@ async def _dev_user(email: str, db: AsyncSession, unauthorized: HTTPException) -
     user = result.scalar_one_or_none()
     if user is None:
         user = User(email=email, display_name=email.split("@")[0].title())
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    return user
+
+
+async def _demo_user(email: str, db: AsyncSession, unauthorized: HTTPException) -> User:
+    """`Bearer demo:<email>` — only with DEMO_MODE on, and only for the two
+    configured demo people. Anyone can act as them, which is the point of a
+    sign-in-free demo and why demo mode can't coexist with real money."""
+    settings = get_settings()
+    email = email.strip().lower()
+    people = settings.demo_people
+    if not settings.demo_mode or email not in people:
+        raise unauthorized
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None:
+        user = User(email=email, display_name=people[email][0])
         db.add(user)
         await db.commit()
         await db.refresh(user)

@@ -50,7 +50,18 @@ export type Integrations = {
   email: boolean;
   push: boolean;
   dev_auth: boolean;
+  demo_mode: boolean;
 };
+
+export type DemoPerson = { email: string; name: string; role: Role; token: string };
+
+export type DemoBootstrap = {
+  household_id: string;
+  household_name: string;
+  people: DemoPerson[];
+};
+
+export type Me = { id: string; email: string; display_name: string | null };
 
 export type Approval = {
   id: string;

@@ -6,7 +6,7 @@ import { Fragment, type ReactNode } from "react";
 function inline(text: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
     part.startsWith("**") && part.endsWith("**") ? (
-      <strong key={i} className="font-semibold text-white">
+      <strong key={i}>
         {part.slice(2, -2)}
       </strong>
     ) : (
@@ -28,7 +28,7 @@ export function Markdown({ text }: { text: string }) {
     if (!list) return;
     const Tag = list.ordered ? "ol" : "ul";
     blocks.push(
-      <Tag key={blocks.length} className={`space-y-1 pl-5 ${list.ordered ? "list-decimal" : "list-disc"}`}>
+      <Tag key={blocks.length}>
         {list.items.map((item, i) => (
           <li key={i}>{inline(item)}</li>
         ))}
@@ -59,5 +59,5 @@ export function Markdown({ text }: { text: string }) {
   }
   flushPara();
   flushList();
-  return <div className="space-y-3">{blocks}</div>;
+  return <>{blocks}</>;
 }

@@ -1,36 +1,30 @@
-// Two ways to be signed in:
-// - Supabase email OTP (production): the access token from the session.
-// - Dev login (local only): `dev:<email>`, accepted by the API only when it
-//   runs with DEV_AUTH_ENABLED in APP_ENV=development.
-import { supabase } from "@/lib/supabaseClient";
+// No sign-in for now: the API runs in DEMO_MODE and accepts
+// `Bearer demo:<email>` for the two demo people only (Rosa, the account
+// owner, and Ana, her approver). Which one you're viewing as is a
+// per-browser convenience, so it lives in localStorage.
+const KEY = "warden.demoEmail";
+let current: string | null = null;
 
-const DEV_KEY = "warden.devEmail";
-
-export function getDevEmail(): string | null {
+export function getDemoEmail(): string | null {
+  if (current) return current;
   try {
-    return window.localStorage.getItem(DEV_KEY);
+    current = window.localStorage.getItem(KEY);
   } catch {
-    return null;
+    current = null;
+  }
+  return current;
+}
+
+export function setDemoEmail(email: string) {
+  current = email;
+  try {
+    window.localStorage.setItem(KEY, email);
+  } catch {
+    /* storage unavailable: the choice just won't survive a reload */
   }
 }
 
-export function setDevEmail(email: string | null) {
-  try {
-    if (email) window.localStorage.setItem(DEV_KEY, email.trim().toLowerCase());
-    else window.localStorage.removeItem(DEV_KEY);
-  } catch {
-    /* storage unavailable: dev login just won't persist */
-  }
-}
-
-export async function getToken(): Promise<string | null> {
-  const dev = getDevEmail();
-  if (dev) return `dev:${dev}`;
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
-}
-
-export async function signOut() {
-  setDevEmail(null);
-  await supabase.auth.signOut();
+export function getToken(): string | null {
+  const email = getDemoEmail();
+  return email ? `demo:${email}` : null;
 }

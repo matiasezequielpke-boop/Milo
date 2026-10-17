@@ -18,6 +18,7 @@ from app.routers import (
     banking,
     chat,
     credentials,
+    demo,
     households,
     monitors,
     suggestions,
@@ -31,7 +32,16 @@ if settings.dev_auth_enabled and settings.app_env != "development":
     # must never be reachable outside a laptop/CI; refuse to boot instead.
     raise RuntimeError("DEV_AUTH_ENABLED is set outside APP_ENV=development. Refusing to start.")
 
-app = FastAPI(title="Warden API", version="0.2.0")
+if settings.demo_mode and (
+    settings.payments_live_enabled
+    or settings.plaid_env == "production"
+    or (settings.stripe_secret_key or "").startswith(("sk_live_", "rk_live_"))
+):
+    # Demo mode has no sign-in: anyone can act as the demo family. That's
+    # only acceptable while nothing can touch real accounts or real money.
+    raise RuntimeError("DEMO_MODE can't run with live payments, live Stripe keys, or Plaid production.")
+
+app = FastAPI(title="Warden API", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,6 +60,7 @@ app.include_router(credentials.router)
 app.include_router(monitors.router)
 app.include_router(households.router)
 app.include_router(banking.router)
+app.include_router(demo.router)
 
 
 @app.get("/health")
@@ -75,6 +86,7 @@ async def integrations():
         "email": bool(settings.resend_api_key),
         "push": bool(settings.ntfy_topic),
         "dev_auth": settings.dev_auth_enabled and settings.app_env == "development",
+        "demo_mode": settings.demo_mode,
     }
 
 
