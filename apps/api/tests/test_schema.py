@@ -33,3 +33,21 @@ def test_supabase_pooler_url_is_adapted_for_asyncpg():
 
     url, options = engine_options("postgresql://milo:milo@localhost:5432/milo")
     assert url.drivername == "postgresql+asyncpg" and options["connect_args"] == {}
+
+
+async def test_unreachable_database_is_a_clear_503():
+    import httpx
+
+    from app import deps
+    from app.main import app
+
+    async def down():
+        raise ConnectionRefusedError(111, "Connect call failed")
+
+    app.dependency_overrides[deps.get_current_user] = down
+    try:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+            r = await c.get("/households", headers={"Authorization": "Bearer x"})
+    finally:
+        app.dependency_overrides.clear()
+    assert r.status_code == 503 and "database" in r.json()["detail"]

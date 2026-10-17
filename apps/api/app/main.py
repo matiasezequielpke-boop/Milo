@@ -7,8 +7,13 @@ banking via Plaid, the family approval gate, and the live agent in chat).
 Every integration stays inert — with a clear error, never a fake result —
 until its key is configured.
 """
-from fastapi import FastAPI
+import logging
+
+import asyncpg.exceptions as pg_errors
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DBAPIError
 
 from app.agents.definitions import AGENTS
 from app.config import get_settings
@@ -53,6 +58,38 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# A database that can't be reached (not configured yet, wrong password,
+# provider down) is a clear 503, not a bare 500.
+_UNREACHABLE = (
+    OSError,
+    pg_errors.InvalidPasswordError,
+    pg_errors.InvalidAuthorizationSpecificationError,
+    pg_errors.InvalidCatalogNameError,
+    pg_errors.CannotConnectNowError,
+    pg_errors.TooManyConnectionsError,
+    pg_errors.ConnectionDoesNotExistError,
+)
+_DB_DOWN = {"detail": "Warden's database isn't reachable right now. Try again in a moment."}
+
+
+@app.exception_handler(OSError)
+async def _os_error(request: Request, exc: OSError) -> JSONResponse:
+    logging.getLogger(__name__).exception("connection failure on %s", request.url.path)
+    return JSONResponse(_DB_DOWN, status_code=503)
+
+
+@app.exception_handler(DBAPIError)
+async def _db_error(request: Request, exc: DBAPIError) -> JSONResponse:
+    logging.getLogger(__name__).exception("database error on %s", request.url.path)
+    if isinstance(exc.orig, _UNREACHABLE) or isinstance(getattr(exc.orig, "__cause__", None), _UNREACHABLE):
+        return JSONResponse(_DB_DOWN, status_code=503)
+    return JSONResponse({"detail": "Something went wrong on our side."}, status_code=500)
+
+
+for _error in _UNREACHABLE[1:]:
+    app.add_exception_handler(_error, _os_error)
+
 
 app.include_router(auth.router)
 app.include_router(chat.router)
