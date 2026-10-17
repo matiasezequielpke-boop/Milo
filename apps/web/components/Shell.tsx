@@ -24,7 +24,7 @@ import {
 import { AgentSheet } from "@/components/AgentSheet";
 import { LegalLinks } from "@/components/Legal";
 import { Toy } from "@/components/Toy";
-import { CAST } from "@/lib/agents";
+import { CAST, scheduleShort } from "@/lib/agents";
 import { useActiveHousehold, useApp } from "@/lib/store";
 
 const NAV = [
@@ -132,7 +132,7 @@ function Toast() {
   }, [toast]);
   return (
     <div className={`toast glass deep ${on ? "on" : ""}`} role="status" aria-live="polite">
-      {toast && <Toy kind={toast.kind} />}
+      {toast && <Toy kind={toast.kind} own={toast.own} />}
       <span>{toast?.text}</span>
     </div>
   );
@@ -260,6 +260,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const needle = q.trim().toLowerCase();
   const match = (s: string) => !needle || s.toLowerCase().includes(needle);
   const liveAgents = CAST.filter((a) => a.live);
+  const canMakeAgents = ready && Boolean(household);
   const agentStatus = (id: string) =>
     !ready ? "idle" : id === "milo" && !app.integrations?.model ? "idle" : id === "warden" && app.pendingApprovals > 0 ? "busy" : "live";
   const showSeg = SEG.some((x) => x.href === pathname);
@@ -332,6 +333,11 @@ export function Shell({ children }: { children: ReactNode }) {
             <div className="grp">
               <div className="h">
                 <span>Agents</span>
+                {canMakeAgents && (
+                  <button className="add" onClick={() => app.openSheet("new")} aria-label="Make an agent" title="Make an agent">
+                    <IconPlus />
+                  </button>
+                )}
               </div>
               {liveAgents
                 .filter((a) => match(a.name) || match(a.role))
@@ -341,6 +347,17 @@ export function Shell({ children }: { children: ReactNode }) {
                     <span className="nm">
                       <b>{a.name}</b>
                       <span>{a.role}</span>
+                    </span>
+                  </button>
+                ))}
+              {app.customAgents
+                .filter((a) => match(a.name) || match(a.instructions))
+                .map((a) => (
+                  <button key={a.id} className={`row ${app.sheet === a.ref ? "on" : ""}`} onClick={() => app.openSheet(a.ref)}>
+                    <Toy kind={a.kind} own status={app.integrations?.model ? "live" : "idle"} />
+                    <span className="nm">
+                      <b>{a.name}</b>
+                      <span>{scheduleShort(a.schedule)}</span>
                     </span>
                   </button>
                 ))}
@@ -502,7 +519,7 @@ export function Shell({ children }: { children: ReactNode }) {
       </div>
 
       <div className={`veil ${menu ? "on" : ""}`} onClick={() => setMenu(false)} aria-hidden="true" />
-      <AgentSheet agentId={app.sheet} onClose={() => app.openSheet(null)} />
+      <AgentSheet sheetId={app.sheet} onClose={() => app.openSheet(null)} />
       <Toast />
     </>
   );

@@ -371,3 +371,38 @@ class SandboxTransactionRequest(BaseModel):
     description: str = Field(min_length=1, max_length=200)
     amount: Decimal = Field(max_digits=12, decimal_places=2)
     date: _date | None = None
+
+
+# --- Custom agents ---
+
+AgentKind = Literal["blob", "mug", "stamp", "lens", "envelope", "calc", "paper", "parcel"]  # not the cast's live faces
+AgentSchedule = Literal["manual", "weekly", "monthly"]
+
+
+class CustomAgentCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    instructions: str = Field(min_length=10, max_length=2000)
+    kind: AgentKind = "blob"
+    schedule: AgentSchedule = "manual"
+
+
+class CustomAgentUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=40)
+    instructions: str | None = Field(default=None, min_length=10, max_length=2000)
+    kind: AgentKind | None = None
+    schedule: AgentSchedule | None = None
+
+
+class CustomAgentResponse(BaseModel):
+    id: uuid.UUID
+    ref: str  # what conversations use as the participant id ("custom:<id>")
+    household_id: uuid.UUID
+    name: str
+    instructions: str
+    kind: str
+    schedule: str
+    next_run_at: datetime | None
+    last_run_at: datetime | None
+    created_at: datetime
+    created_by: str | None
+    can_edit: bool

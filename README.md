@@ -16,6 +16,7 @@ Warden helps families protect an older parent's money. It watches the parent's b
 | Live Milo/Warden agent on Claude (tool use, streaming, append-only history) | `apps/api/app/agent/` | Built; loop tested with a scripted model. Needs `ANTHROPIC_API_KEY` |
 | Web console: chat, approvals, alerts, money, family/consent, activity | `apps/web` | Built; walked through in Chromium as both roles |
 | Shared, append-only audit log | `audit_log`, `GET /households/{id}/audit` | Built, tested |
+| Agents the family makes: a name, a face, one job, run on demand or weekly/monthly; read-only tools only; make/change/delete from the Cast page or the sidebar | `apps/api/app/custom_agents.py`, `routers/custom_agents.py`, `apps/web/components/CustomAgentSheet.tsx` | Built, tested. Scheduled runs need the Celery worker + beat below |
 
 Nothing answers with scripted text and nothing fakes a provider: with a key missing, the feature says exactly which key is missing. Fakes exist only inside `apps/api/tests/`. How money moves, and what must change before real money: [`docs/money-plan.md`](docs/money-plan.md).
 
@@ -113,11 +114,11 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-Run the background worker (optional — only needed to exercise Fase 6's heartbeat):
+Run the background worker (needed for scheduled custom-agent runs, checked every 15 minutes; also runs Fase 6's heartbeat):
 
 ```bash
 celery -A app.celery_app worker --loglevel=info
-celery -A app.celery_app beat --loglevel=info   # separate process, schedules the heartbeat
+celery -A app.celery_app beat --loglevel=info   # separate process, schedules agents.run_due and the heartbeat
 ```
 
 Frontend:

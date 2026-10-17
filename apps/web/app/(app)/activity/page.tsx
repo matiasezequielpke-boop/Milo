@@ -7,7 +7,7 @@ import { useHouseholdData } from "@/components/useHouseholdData";
 import { Empty, Notice, Ready, Spinner } from "@/components/ui";
 import { when } from "@/lib/format";
 import { useApp } from "@/lib/store";
-import type { AuditEntry } from "@/lib/types";
+import type { AgentSchedule, AuditEntry } from "@/lib/types";
 
 function describe(e: AuditEntry): string {
   const d = e.detail as Record<string, string | number | string[] | undefined>;
@@ -52,10 +52,22 @@ function describe(e: AuditEntry): string {
       return `Couldn't complete an approved action: ${d.error}`;
     case "subscription.cancel_requested":
       return `Cancellation prepared for ${d.merchant}`;
+    case "agent.created":
+      return `${d.by} made the agent "${d.name}" · ${RUNS[d.schedule as AgentSchedule] ?? "runs when asked"}`;
+    case "agent.updated":
+      return `${d.by} changed the agent "${d.name}"`;
+    case "agent.deleted":
+      return `${d.by} deleted the agent "${d.name}"`;
     default:
       return e.event_type;
   }
 }
+
+const RUNS: Record<AgentSchedule, string> = {
+  manual: "runs when asked",
+  weekly: "runs every Monday",
+  monthly: "runs on the 1st of each month",
+};
 
 const AGENT_TOY = { warden: "lock", sentinel: "star", milo: "beacon" } as const;
 

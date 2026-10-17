@@ -2,16 +2,23 @@
 
 import { useEffect } from "react";
 
+import { IconPlus } from "@/components/icons";
 import { Toy } from "@/components/Toy";
-import { CAST } from "@/lib/agents";
-import { useApp } from "@/lib/store";
+import { CAST, scheduleShort } from "@/lib/agents";
+import { useActiveHousehold, useApp } from "@/lib/store";
 
 export default function CastPage() {
   const setCrumb = useApp((s) => s.setCrumb);
   const openSheet = useApp((s) => s.openSheet);
+  const custom = useApp((s) => s.customAgents);
+  const ready = useApp((s) => s.status === "ready");
+  const household = useActiveHousehold();
   const live = CAST.filter((a) => a.live).length;
 
-  useEffect(() => setCrumb("Your agents", `${live} live`), [setCrumb, live]);
+  useEffect(
+    () => setCrumb("Your agents", custom.length ? `${live} live · ${custom.length} yours` : `${live} live`),
+    [setCrumb, live, custom.length],
+  );
 
   return (
     <div className="cast">
@@ -34,6 +41,38 @@ export default function CastPage() {
           </button>
         ))}
       </div>
+
+      {ready && household && (
+        <>
+          <span className="kicker sec">Yours</span>
+          <p className="lede">
+            Make an agent for one job — a monthly spending review, a weekly bill check. <b>It reads the accounts and reports back</b>; it
+            can&apos;t move money.
+          </p>
+          <div className="cgrid">
+            {custom.map((a) => (
+              <button key={a.id} className="ccard glass" onClick={() => openSheet(a.ref)}>
+                <div className="stage">
+                  <Toy kind={a.kind} own />
+                </div>
+                <b>{a.name}</b>
+                <span>{a.created_by ? `Made by ${a.created_by}` : "Made by your family"}</span>
+                <span className="toylab">
+                  <i />
+                  {scheduleShort(a.schedule)}
+                </span>
+              </button>
+            ))}
+            <button className="ccard make" onClick={() => openSheet("new")}>
+              <div className="stage">
+                <IconPlus />
+              </div>
+              <b>Make an agent</b>
+              <span>Give it a name, a face and a job</span>
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

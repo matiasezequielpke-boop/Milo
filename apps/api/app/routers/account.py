@@ -40,6 +40,7 @@ from app.models import (
     Consent,
     Conversation,
     Credential,
+    CustomAgent,
     Household,
     HouseholdMember,
     LoginChallenge,
@@ -106,11 +107,13 @@ async def export_my_data(db: AsyncSession = Depends(get_db), user: User = Depend
                 bills=await _all(db, Bill, Bill.household_id == hid),
                 payments=await _all(db, Payment, Payment.household_id == hid),
                 approvals=await _all(db, ApprovalRequest, ApprovalRequest.household_id == hid),
+                agents=await _all(db, CustomAgent, CustomAgent.household_id == hid),
                 activity=await _all(db, AuditLogEntry, AuditLogEntry.household_id == hid),
             )
         else:
             entry.update(
                 consents_given_to_me=await _all(db, Consent, Consent.approver_member_id == m.id),
+                agents_i_made=await _all(db, CustomAgent, CustomAgent.household_id == hid, CustomAgent.created_by_user_id == user.id),
                 approvals_i_requested_or_decided=await _all(
                     db,
                     ApprovalRequest,
@@ -214,6 +217,8 @@ async def _leave_household(db: AsyncSession, member: HouseholdMember, user: User
                 await db.delete(connection)
                 await db.flush()
                 await db.delete(credential)
+    # Agents this person made carry their own words; they go with them.
+    await db.execute(delete(CustomAgent).where(CustomAgent.household_id == hid, CustomAgent.created_by_user_id == user.id))
     member.status = MemberStatus.removed
     member.user_id = None
     member.invite_token_hash = None

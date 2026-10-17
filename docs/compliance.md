@@ -36,6 +36,7 @@ The 20 "so your app doesn't get sued" items, mapped to what the code now does. T
 | Bank accounts, balances, 2 years of transactions | Detection, answers | `bank_*` (Plaid token encrypted in `credentials`) | With the household |
 | Alerts, bills, approvals, payments | The service | Warden tables | With the household |
 | Chat messages | Chat | `conversations`, `messages` | Until account deletion |
+| Agents people make (name, face, job text, schedule, maker, last run) | Custom agents | `custom_agents`; their reports are chats | With the household; an approver's agents go when they delete their account |
 | Activity log | Family record | `audit_log` | With the household |
 | Sign-in attempts (email, time) | Rate limiting | `login_challenges` | 30 days |
 | Sessions | Login gate | `auth_sessions` | Until account deletion |

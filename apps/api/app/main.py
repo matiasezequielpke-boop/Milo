@@ -19,6 +19,7 @@ from app.routers import (
     banking,
     chat,
     credentials,
+    custom_agents,
     demo,
     households,
     monitors,
@@ -63,6 +64,7 @@ app.include_router(households.router)
 app.include_router(banking.router)
 app.include_router(demo.router)
 app.include_router(account.router)
+app.include_router(custom_agents.router)
 
 
 @app.get("/health")

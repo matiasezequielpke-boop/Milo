@@ -27,14 +27,14 @@ from datetime import date, datetime, timedelta, timezone
 import anthropic
 from sqlalchemy import select, update
 
-from app import warden
+from app import custom_agents, warden
 from app.agent.history import build_api_messages
-from app.agent.prompts import SYSTEM_PROMPT
+from app.agent.prompts import CUSTOM_AGENT_PROMPT, SYSTEM_PROMPT
 from app.agent.tools import TOOL_DEFINITIONS, TOOLS_BY_NAME, ToolContext, run_tool
 from app.config import get_settings
 from app.db import SessionLocal
 from app.households import SCOPE_APPROVE_ACTIONS, SCOPE_VIEW_ACCOUNTS, get_membership
-from app.models import Conversation, Message, User
+from app.models import Conversation, CustomAgent, Message, User
 
 logger = logging.getLogger(__name__)
 
@@ -77,13 +77,23 @@ def context_block(membership, today: date) -> dict:
     }
 
 
-def _request_kwargs(model: str, messages: list[dict]) -> dict:
+_READ_ONLY_DEFINITIONS = [t for t in TOOL_DEFINITIONS if t["name"] in custom_agents.READ_ONLY_TOOLS]
+
+
+def _request_kwargs(model: str, messages: list[dict], agent: CustomAgent | None = None) -> dict:
+    """Milo by default; a custom agent gets its own prompt + job and only
+    the read-only tools."""
     settings = get_settings()
+    system = (
+        [{"type": "text", "text": CUSTOM_AGENT_PROMPT}, custom_agents.job_block(agent)]
+        if agent is not None
+        else [{"type": "text", "text": SYSTEM_PROMPT}]
+    )
     kwargs: dict = {
         "model": model,
         "max_tokens": _MAX_TOKENS,
-        "system": [{"type": "text", "text": SYSTEM_PROMPT}],
-        "tools": TOOL_DEFINITIONS,
+        "system": system,
+        "tools": _READ_ONLY_DEFINITIONS if agent is not None else TOOL_DEFINITIONS,
         "messages": messages,
         "thinking": {"type": "adaptive"},
         "output_config": {"effort": settings.warden_effort},
@@ -128,8 +138,17 @@ async def run_turn(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str) ->
         if membership is None:
             yield _sse("error", {"message": "You're no longer a member of this household."})
             return
+        agent: CustomAgent | None = None
+        custom_id = custom_agents.agent_id_from(conversation.active_participants)
+        if custom_id is not None:
+            agent = await db.get(CustomAgent, custom_id)
+            if agent is None or agent.household_id != conversation.household_id:
+                yield _sse("error", {"message": "This agent was deleted, so it can't answer anymore."})
+                return
+        speaker = custom_agents.ref(agent.id) if agent else "milo"
+        name = agent.name if agent else "Milo"
         if not await _claim(db, conversation_id):
-            yield _sse("error", {"message": "Milo is still answering the previous message. Try again in a moment."})
+            yield _sse("error", {"message": f"{name} is still answering the previous message. Try again in a moment."})
             return
 
         try:
@@ -150,7 +169,7 @@ async def run_turn(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str) ->
                 )
             )
             await db.commit()
-            yield _sse("start", {"agent_id": "milo", "model": model})
+            yield _sse("start", {"agent_id": speaker, "model": model})
 
             last_message_id: uuid.UUID | None = None
             for _round in range(settings.warden_max_tool_rounds):
@@ -160,7 +179,7 @@ async def run_turn(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str) ->
                 messages = build_api_messages(list(rows))
 
                 try:
-                    async with client.beta.messages.stream(**_request_kwargs(model, messages)) as stream:
+                    async with client.beta.messages.stream(**_request_kwargs(model, messages, agent)) as stream:
                         async for event in stream:
                             if event.type == "text":
                                 yield _sse("delta", {"content": event.text})
@@ -171,7 +190,7 @@ async def run_turn(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str) ->
                                     {
                                         "name": event.content_block.name,
                                         "status": tool.status_text if tool else event.content_block.name,
-                                        "agent": tool.agent if tool else "milo",
+                                        "agent": speaker if agent else (tool.agent if tool else "milo"),
                                     },
                                 )
                         final = await stream.get_final_message()
@@ -185,7 +204,7 @@ async def run_turn(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str) ->
                     yield _sse("error", {"message": "The model API key was rejected. Check ANTHROPIC_API_KEY."})
                     return
                 except anthropic.RateLimitError:
-                    yield _sse("error", {"message": "Milo is getting too many requests right now. Try again in a minute."})
+                    yield _sse("error", {"message": f"{name} is getting too many requests right now. Try again in a minute."})
                     return
                 except anthropic.APIStatusError as exc:
                     logger.exception("model call failed")
@@ -201,7 +220,7 @@ async def run_turn(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str) ->
                     # A declined turn is discarded, not stored: the partial
                     # text never becomes part of the replayed history.
                     yield _sse("reset", {})
-                    yield _sse("error", {"message": "Milo can't help with that request."})
+                    yield _sse("error", {"message": f"{name} can't help with that request."})
                     return
                 if final.stop_reason == "max_tokens" and tool_uses:
                     yield _sse("reset", {})
@@ -212,7 +231,7 @@ async def run_turn(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str) ->
                 assistant = Message(
                     conversation_id=conversation_id,
                     role="agent",
-                    agent_id="milo",
+                    agent_id=speaker,
                     model=final.model,
                     content=visible,
                     api_content=[b.to_dict(mode="json") for b in final.content],
@@ -233,7 +252,11 @@ async def run_turn(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str) ->
                 )
                 results = []
                 for block in tool_uses:
-                    content, is_error = await run_tool(ctx, block.name, block.input)
+                    if agent is not None and block.name not in custom_agents.READ_ONLY_TOOLS:
+                        # Defined tools are already read-only; this holds even if a call slips through.
+                        content, is_error = f"{block.name} isn't available to custom agents (read-only).", True
+                    else:
+                        content, is_error = await run_tool(ctx, block.name, block.input)
                     result = {"type": "tool_result", "tool_use_id": block.id, "content": content}
                     if is_error:
                         result["is_error"] = True
@@ -265,7 +288,7 @@ async def run_turn(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str) ->
                     return
                 membership = refreshed
             else:
-                yield _sse("error", {"message": "Milo needed too many steps for that. Try a simpler request."})
+                yield _sse("error", {"message": f"{name} needed too many steps for that. Try a simpler request."})
 
             await db.execute(
                 update(Conversation).where(Conversation.id == conversation_id).values(updated_at=datetime.now(timezone.utc))

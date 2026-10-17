@@ -1,4 +1,5 @@
 import type { ToyKind } from "@/components/Toy";
+import type { AgentSchedule, CustomAgent } from "@/lib/types";
 
 // The cast. Only Milo, Warden and Sentinel exist in this build; the rest
 // are shown as "coming soon" and never answer or claim to do anything.
@@ -106,3 +107,67 @@ export const CAST: CastAgent[] = [
 ];
 
 export const agentById = (id: string | null | undefined): CastAgent => CAST.find((a) => a.id === id) ?? CAST[0];
+
+// ── Agents the family makes ────────────────────────────────────────────
+// Each does one job, reads the accounts and reports back. They can't pay,
+// cancel or ask for approvals (the API only gives them read-only tools).
+
+export const CUSTOM_PREFIX = "custom:";
+export const RUN_NOW_TEXT = "Run your job now and report back.";
+// Warden's own agents; the API refuses these names too.
+export const RESERVED_NAMES = [...CAST.map((a) => a.id), "warden"];
+// Not Milo's, Sentinel's or Warden's faces; the rest are drawn in their
+// own colors (Toy `own`), so a family's agent never passes for the cast.
+export const CUSTOM_KINDS: ToyKind[] = ["blob", "mug", "stamp", "lens", "envelope", "calc", "paper", "parcel"];
+
+export const SCHEDULES: { value: AgentSchedule; label: string; short: string }[] = [
+  { value: "manual", label: "Only when I ask", short: "When you ask" },
+  { value: "weekly", label: "Every Monday morning", short: "Every Monday" },
+  { value: "monthly", label: "On the 1st of every month", short: "Monthly, on the 1st" },
+];
+export const scheduleShort = (s: AgentSchedule) => SCHEDULES.find((x) => x.value === s)?.short ?? s;
+
+export const AGENT_TEMPLATES: { name: string; kind: ToyKind; schedule: AgentSchedule; instructions: string }[] = [
+  {
+    name: "Spending review",
+    kind: "calc",
+    schedule: "monthly",
+    instructions:
+      "Review the spending for the past month. Group it by category, compare it with the month before, and point out anything that grew or looks unusual.",
+  },
+  {
+    name: "Bill watch",
+    kind: "envelope",
+    schedule: "weekly",
+    instructions: "List the bills due in the next two weeks with their amounts and due dates, and say if any is higher than usual.",
+  },
+  {
+    name: "Subscription check",
+    kind: "parcel",
+    schedule: "monthly",
+    instructions:
+      "List every subscription and recurring charge with what it costs per month and per year. Point out any that started recently or got more expensive.",
+  },
+  {
+    name: "Big charge check",
+    kind: "lens",
+    schedule: "weekly",
+    instructions:
+      "Look at the past week's charges and list anything over $200 or from a merchant that hasn't been paid before, with why it stood out.",
+  },
+];
+
+/** The custom agent a conversation is with, if any. */
+export const customRefOf = (participants: string[] | null | undefined): string | null =>
+  participants?.length === 1 && participants[0].startsWith(CUSTOM_PREFIX) ? participants[0] : null;
+
+/** Who wrote a message: one of the cast, or an agent the family made
+ *  (which may have been deleted since). */
+export function speakerFor(id: string | null | undefined, custom: CustomAgent[]): { name: string; kind: ToyKind; own: boolean } {
+  if (id?.startsWith(CUSTOM_PREFIX)) {
+    const a = custom.find((x) => x.ref === id);
+    return a ? { name: a.name, kind: a.kind, own: true } : { name: "Deleted agent", kind: "blob", own: true };
+  }
+  const a = agentById(id);
+  return { name: a.name, kind: a.kind, own: false };
+}

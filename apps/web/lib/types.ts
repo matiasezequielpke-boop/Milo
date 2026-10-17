@@ -1,6 +1,8 @@
 // Shapes returned by apps/api (see app/schemas.py). Amounts arrive as
 // strings (Decimal) and are formatted, never re-computed, on this side.
 
+import type { ToyKind } from "@/components/Toy";
+
 export type Role = "elder" | "approver";
 export type Scope = "view_accounts" | "receive_alerts" | "approve_actions";
 
@@ -168,6 +170,7 @@ export type Conversation = {
   id: string;
   household_id: string | null;
   title: string | null;
+  active_participants: string[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -187,4 +190,23 @@ export type SyncResult = {
   modified: number;
   removed: number;
   new_alerts: number;
+};
+
+export type AgentSchedule = "manual" | "weekly" | "monthly";
+
+/** An agent a family member made for one job. `ref` is what conversations
+ *  and messages use to name it ("custom:<id>"). */
+export type CustomAgent = {
+  id: string;
+  ref: string;
+  household_id: string;
+  name: string;
+  instructions: string;
+  kind: ToyKind;
+  schedule: AgentSchedule;
+  next_run_at: string | null;
+  last_run_at: string | null;
+  created_at: string;
+  created_by: string | null;
+  can_edit: boolean;
 };

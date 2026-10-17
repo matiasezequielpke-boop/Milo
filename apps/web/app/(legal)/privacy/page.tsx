@@ -44,6 +44,10 @@ export default function PrivacyPage() {
           blocks, and how you resolved alerts.
         </li>
         <li>
+          <b>Agents you make:</b> the name, face, job description and schedule you give an agent, who made it, and when it last ran. Its
+          reports are saved as chats. Everyone in the family can see the agents and their jobs.
+        </li>
+        <li>
           <b>Sign-in security records:</b> the email and time of each sign-in attempt, used to stop password guessing, and the sessions
           you&apos;re signed in with. Warden doesn&apos;t store IP addresses or device fingerprints; our hosting providers keep standard
           server logs for a short time.
@@ -57,9 +61,9 @@ export default function PrivacyPage() {
 
       <h2>How we use it</h2>
       <ul>
-        <li>To run the service: watch for suspicious charges, recurring payments and bills; answer questions in chat; ask the family to approve payments or cancellations; and carry out what was approved.</li>
+        <li>To run the service: watch for suspicious charges, recurring payments and bills; answer questions in chat; run the agents you make (on demand or on their schedule) and save their reports; ask the family to approve payments or cancellations; and carry out what was approved.</li>
         <li>To keep accounts secure: the two-step login (password, then a code we email you), rate limits, and the activity log.</li>
-        <li>To send you service emails: sign-in codes, approval requests, alerts and outcomes. You can turn off everything except sign-in codes.</li>
+        <li>To send you service emails: sign-in codes, approval requests, alerts, outcomes, and a note when a scheduled agent you made has finished its report. You can turn off everything except sign-in codes.</li>
       </ul>
       <p>
         We don&apos;t sell personal information, share it for cross-context behavioral advertising, or use it to build marketing profiles. We
@@ -96,7 +100,7 @@ export default function PrivacyPage() {
           <tr>
             <td>Anthropic</td>
             <td>The AI (Claude) behind the chat</td>
-            <td>Your chat messages and the account details needed to answer them, under commercial terms that don&apos;t allow training on this data</td>
+            <td>Your chat messages, the jobs of agents you make, and the account details needed to answer them, under commercial terms that don&apos;t allow training on this data</td>
           </tr>
           <tr>
             <td>Stripe</td>
@@ -131,7 +135,7 @@ export default function PrivacyPage() {
         </li>
         <li>
           If you were a family approver, the account owner&apos;s activity log keeps your name next to decisions you made, because the owner
-          needs that record of who approved what.
+          needs that record of who approved what. Agents you made are deleted with your account.
         </li>
       </ul>
 

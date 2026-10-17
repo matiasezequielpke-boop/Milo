@@ -372,6 +372,45 @@ a{color:inherit;text-decoration:none}
 .fl input::placeholder{color:var(--ink-3)}
 .fl input:focus,.fl textarea:focus,.fl select:focus{outline:none;box-shadow:inset 0 0 0 1.5px var(--accent)}
 .sf{padding:14px 18px;display:flex;gap:10px;justify-content:flex-end;box-shadow:inset 0 .5px 0 var(--hair)}
+/* agents the family makes: the form and the detail view */
+.fl textarea{resize:vertical;min-height:112px;line-height:1.5}
+.fl textarea::placeholder{color:var(--ink-3)}
+.fhint{font-size:12px;color:var(--ink-3);margin:-9px 0 15px}
+.fhint.err{color:var(--bad)}
+.tpl{margin:0 0 16px}
+.tpl>span{display:block;font-size:12.5px;color:var(--ink-3);margin-bottom:8px;font-weight:500}
+.tpl>div{display:flex;flex-wrap:wrap;gap:6px}
+.tpl .sug{font-size:12.5px;padding:6px 12px}
+.faces{border:0;padding:0;margin:0 0 15px;min-width:0;display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.faces legend{font-size:12.5px;color:var(--ink-3);margin-bottom:7px;font-weight:500;padding:0}
+.faces label{position:relative;display:grid;place-items:center;height:62px;border-radius:14px;background:var(--fill);cursor:pointer;
+  box-shadow:inset 0 0 0 .5px var(--hair),inset 0 1px 0 var(--bevel-top);transition:transform .1s ease-out,background .16s}
+.faces label:hover{background:var(--inset)}
+.faces label:active{transform:scale(.94)}
+.faces label.on{background:var(--inset);box-shadow:inset 0 0 0 2px var(--accent)}
+.faces label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.faces input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.faces .toy{width:40px;height:40px}
+.cl.notes li{font-size:12.5px;color:var(--ink-3)}
+.cl.notes li svg,.cl li.no svg{color:var(--ink-3)}
+.sheet .job{font-size:13.5px;line-height:1.55;color:var(--ink-2);white-space:pre-wrap;overflow-wrap:anywhere;margin:0;padding:11px 13px;border-radius:13px;
+  background:var(--fill);box-shadow:inset 0 0 0 .5px var(--hair),inset 0 1px 0 var(--bevel-top)}
+.mrow{display:flex;gap:8px}
+.confirm{padding:12px 13px;border-radius:14px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bad) 45%,transparent)}
+.confirm p{margin:0 0 10px;font-size:13.5px;line-height:1.5;color:var(--ink-2)}
+.confirm b{color:var(--ink)}
+.confirm div{display:flex;gap:8px;justify-content:flex-end}
+.grp .h .add{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;color:var(--ink-3);margin:-4px -4px -4px 0;transition:background .16s,transform .1s ease-out}
+.grp .h .add:hover{background:var(--fill);color:var(--ink)}
+.grp .h .add:active{transform:scale(.92)}
+.grp .h .add svg{width:13px;height:13px}
+.cast .kicker.sec{margin-top:36px}
+.ccard.make{background:transparent;box-shadow:inset 0 0 0 1.5px var(--hair-2)}
+.ccard.make .stage{color:var(--ink-3)}
+.ccard.make .stage svg{width:30px;height:30px}
+.ccard.make .stage::after{display:none}
+.ccard.make:hover .stage{color:var(--accent)}
+.hello .sub{font-size:13.5px;color:var(--ink-3);max-width:52ch;text-align:center;margin:-14px 0 22px;line-height:1.5;text-wrap:balance}
 .bt{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 17px;border-radius:13px;font-weight:600;font-size:13.5px;white-space:nowrap;
   transition:transform .1s ease-out,filter .2s}
 .bt:active:not(:disabled){transform:scale(.96)}

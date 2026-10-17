@@ -137,3 +137,18 @@ export const IconDownload = () => (
     <path d="M12 3v12M7 10l5 5 5-5M4 21h16" />
   </Icon>
 );
+export const IconTrash = () => (
+  <Icon>
+    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+  </Icon>
+);
+export const IconPlay = () => (
+  <Icon>
+    <path d="M7 4.5v15l12-7.5z" />
+  </Icon>
+);
+export const IconEdit = () => (
+  <Icon>
+    <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />
+  </Icon>
+);

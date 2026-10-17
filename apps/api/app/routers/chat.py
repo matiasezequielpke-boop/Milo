@@ -25,13 +25,14 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import custom_agents
 from app.agent.runner import run_turn
 from app.agents.definitions import get_agent
 from app.db import SessionLocal, get_db
 from app.deps import get_current_user
 from app.households import require_member
 from app.gateway import CompletionRequest, ModelNotConfiguredError, stream_complete
-from app.models import Conversation, Message, User
+from app.models import Conversation, CustomAgent, Message, User
 from app.schemas import ChatRequest, ConversationCreateRequest, ConversationResponse, MessageResponse
 
 router = APIRouter(prefix="/conversations", tags=["chat"])
@@ -54,6 +55,11 @@ async def create_conversation(
 ) -> Conversation:
     if body.household_id is not None:
         await require_member(db, body.household_id, current_user)
+    custom_id = custom_agents.agent_id_from(body.active_participants)
+    if custom_id is not None:
+        agent = await db.get(CustomAgent, custom_id)
+        if agent is None or body.household_id is None or agent.household_id != body.household_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
     conversation = Conversation(
         user_id=current_user.id,
         household_id=body.household_id,

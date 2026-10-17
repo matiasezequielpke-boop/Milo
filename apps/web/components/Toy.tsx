@@ -32,6 +32,20 @@ const TONE: Record<string, [string, string]> = {
   taupe: ["#C0AA97", "#9C8570"],
   ochre: ["#DDB275", "#BC8C48"],
   plum: ["#BDA2B4", "#96798D"],
+  // worn only by agents the family makes, so none is mistaken for the cast
+  teal: ["#A4C9C2", "#73A099"],
+  lavender: ["#BEB6DA", "#9087B8"],
+  peach: ["#F0BB98", "#CC8C64"],
+  moss: ["#B6C795", "#889C63"],
+  sky: ["#AECBE2", "#7FA2BE"],
+};
+
+const OWN_TONE: Partial<Record<ToyKind, keyof typeof TONE>> = {
+  lens: "teal",
+  envelope: "lavender",
+  calc: "peach",
+  paper: "sky",
+  parcel: "moss",
 };
 
 type Tone = [string, string];
@@ -175,10 +189,10 @@ const SPEC: Record<ToyKind, Spec> = {
   },
 };
 
-function toySvg(kind: ToyKind, id: string, moodOverride?: "flat") {
+function toySvg(kind: ToyKind, id: string, own: boolean, moodOverride?: "flat") {
   const c = SPEC[kind] ?? SPEC.blob;
   const g = `g${id}`;
-  const t = TONE[c.t];
+  const t = TONE[(own && OWN_TONE[kind]) || c.t];
   const [fx, fy, fs] = c.f;
   const body = c.b(t, g);
   return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
@@ -196,25 +210,28 @@ function toySvg(kind: ToyKind, id: string, moodOverride?: "flat") {
 }
 
 /** Decorative by default (the agent's name is always written next to it).
- *  Pass `label` where the picture stands on its own. */
+ *  Pass `label` where the picture stands on its own, and `own` for an
+ *  agent the family made (its own colors). */
 export function Toy({
   kind,
   className = "toy",
   status,
   style,
   label,
+  own = false,
 }: {
   kind: ToyKind;
   className?: string;
   status?: "live" | "idle" | "busy";
   style?: React.CSSProperties;
   label?: string;
+  own?: boolean;
 }) {
   // SVG ids must be unique per instance; useId is stable across SSR/CSR.
   const id = `t${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
     <span className={className} style={style} {...(label ? { role: "img", "aria-label": label } : { "aria-hidden": true })}>
-      <span style={{ display: "block", width: "100%", height: "100%" }} dangerouslySetInnerHTML={{ __html: toySvg(kind, id) }} />
+      <span style={{ display: "block", width: "100%", height: "100%" }} dangerouslySetInnerHTML={{ __html: toySvg(kind, id, own) }} />
       {status && <span className={`st ${status}`} />}
     </span>
   );

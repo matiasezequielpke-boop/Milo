@@ -37,6 +37,11 @@ celery_app.conf.beat_schedule = {
         "task": "sentinel.run_due_monitors",
         "schedule": crontab(minute="*/5"),
     },
+    # Custom agents' weekly/monthly runs (app/custom_agents.py).
+    "custom-agents": {
+        "task": "agents.run_due",
+        "schedule": crontab(minute="*/15"),
+    },
 }
 
 celery_app.autodiscover_tasks(["app"])

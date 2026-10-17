@@ -594,6 +594,32 @@ class Bill(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class CustomAgent(Base):
+    """An agent a family member made for one job ("review last month's
+    spending"). It runs on the same model as Milo with read-only tools —
+    it can look things up and report, never move money or change anything.
+    Its instructions are the person's own words and are treated as a job
+    description, not as permissions."""
+
+    __tablename__ = "custom_agents"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    household_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("households.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(String(40), nullable=False)
+    instructions: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="blob")  # mascot shape
+    # "manual" | "weekly" (Mondays) | "monthly" (the 1st)
+    schedule: Mapped[str] = mapped_column(String(10), nullable=False, default="manual")
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Payment(Base):
     __tablename__ = "payments"
 

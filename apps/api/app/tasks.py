@@ -18,3 +18,22 @@ def run_due_monitors() -> dict:
         "status": "heartbeat ok",
         "note": "beat schedule + Redis broker confirmed working; no monitor checkers implemented yet",
     }
+
+
+@celery_app.task(name="agents.run_due")
+def run_due_agents() -> list[dict]:
+    """Starts the custom agents whose weekly/monthly run is due."""
+    import asyncio
+
+    from app.custom_agents import run_due
+    from app.db import engine
+
+    async def go():
+        try:
+            return await run_due()
+        finally:
+            # Each task runs in a fresh event loop; don't keep pooled
+            # connections bound to a loop that's about to close.
+            await engine.dispose()
+
+    return asyncio.run(go())

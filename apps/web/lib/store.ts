@@ -5,7 +5,7 @@ import { create } from "zustand";
 import type { ToyKind } from "@/components/Toy";
 import { api, API_URL, ApiError } from "@/lib/api";
 import { getDemoEmail, getSession, setDemoEmail, setSession, type Session } from "@/lib/auth";
-import type { Alert, Approval, Conversation, DemoBootstrap, DemoPerson, Household, Integrations, Me } from "@/lib/types";
+import type { Alert, Approval, Conversation, CustomAgent, DemoBootstrap, DemoPerson, Household, Integrations, Me } from "@/lib/types";
 
 // offline     — this site has no API configured (NEXT_PUBLIC_API_URL unset)
 // unreachable — an API is configured but didn't answer
@@ -13,7 +13,7 @@ import type { Alert, Approval, Conversation, DemoBootstrap, DemoPerson, Househol
 export type Status = "loading" | "offline" | "unreachable" | "signed-out" | "ready";
 export type Mode = "user" | "demo";
 
-type Toast = { id: number; text: string; kind: ToyKind };
+type Toast = { id: number; text: string; kind: ToyKind; own: boolean };
 
 type State = {
   status: Status;
@@ -28,6 +28,11 @@ type State = {
   openAlerts: number;
   conversations: Conversation[];
   activeConversation: string | null;
+  customAgents: CustomAgent[];
+  // The custom agent a new chat goes to (null = Milo), and a request for
+  // the chat page to start that agent's job right away.
+  chatAgent: string | null;
+  autoRun: number;
   crumb: { title: string; sub?: string };
   toast: Toast | null;
   sheet: string | null;
@@ -39,13 +44,16 @@ type State = {
   refreshHouseholds: () => Promise<void>;
   refreshCounts: () => Promise<void>;
   refreshConversations: () => Promise<void>;
+  refreshAgents: () => Promise<void>;
   setConversation: (id: string | null) => void;
+  startAgentChat: (ref: string, runNow?: boolean) => void;
   setCrumb: (title: string, sub?: string) => void;
-  showToast: (text: string, kind?: ToyKind) => void;
+  showToast: (text: string, kind?: ToyKind, own?: boolean) => void;
   openSheet: (agentId: string | null) => void;
 };
 
 let toastSeq = 0;
+let runSeq = 0;
 
 export const useApp = create<State>((set, get) => {
   // Everything that depends on who is viewing: who they are, their
@@ -54,7 +62,7 @@ export const useApp = create<State>((set, get) => {
     const me = await api<Me>("/auth/me");
     const households = await api<Household[]>("/households");
     set({ me, households, activeId: households[0]?.id ?? null });
-    await Promise.all([get().refreshCounts(), get().refreshConversations()]);
+    await Promise.all([get().refreshCounts(), get().refreshConversations(), get().refreshAgents()]);
     set({ status: "ready", error: null });
   }
 
@@ -66,6 +74,9 @@ export const useApp = create<State>((set, get) => {
     activeId: null,
     conversations: [],
     activeConversation: null,
+    customAgents: [],
+    chatAgent: null,
+    autoRun: 0,
     pendingApprovals: 0,
     openAlerts: 0,
   };
@@ -91,6 +102,9 @@ export const useApp = create<State>((set, get) => {
     openAlerts: 0,
     conversations: [],
     activeConversation: null,
+    customAgents: [],
+    chatAgent: null,
+    autoRun: 0,
     crumb: { title: "New task" },
     toast: null,
     sheet: null,
@@ -148,7 +162,7 @@ export const useApp = create<State>((set, get) => {
       const person = get().people.find((p) => p.email === email);
       if (!person || email === get().me?.email) return;
       setDemoEmail(email);
-      set({ activeConversation: null, conversations: [], pendingApprovals: 0, openAlerts: 0 });
+      set({ activeConversation: null, conversations: [], customAgents: [], chatAgent: null, pendingApprovals: 0, openAlerts: 0 });
       try {
         await enter();
         get().showToast(`Now viewing as ${person.name}`, person.role === "elder" ? "beacon" : "lock");
@@ -184,9 +198,17 @@ export const useApp = create<State>((set, get) => {
       set({ conversations });
     },
 
-    setConversation: (id) => set({ activeConversation: id }),
+    refreshAgents: async () => {
+      const id = get().activeId;
+      if (!id) return;
+      const customAgents = await api<CustomAgent[]>(`/households/${id}/agents`).catch(() => [] as CustomAgent[]);
+      set({ customAgents });
+    },
+
+    setConversation: (id) => set({ activeConversation: id, chatAgent: null, autoRun: 0 }),
+    startAgentChat: (ref, runNow = false) => set({ activeConversation: null, chatAgent: ref, autoRun: runNow ? ++runSeq : 0 }),
     setCrumb: (title, sub) => set({ crumb: { title, sub } }),
-    showToast: (text, kind = "beacon") => set({ toast: { id: ++toastSeq, text, kind } }),
+    showToast: (text, kind = "beacon", own = false) => set({ toast: { id: ++toastSeq, text, kind, own } }),
     openSheet: (agentId) => set({ sheet: agentId }),
   };
 });
