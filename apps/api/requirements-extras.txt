@@ -1,0 +1,9 @@
+# Not needed by the web API (and kept out of the Vercel deployment):
+# the Celery worker/beat for self-hosting, and the pre-Warden fleet tools
+# (LiteLLM gateway, web search, code sandbox). The app imports these lazily
+# and says clearly when one isn't installed.
+litellm==1.105.1
+redis==8.1.0
+celery==5.6.3
+tavily-python==0.8.5
+e2b-code-interpreter==2.11.0

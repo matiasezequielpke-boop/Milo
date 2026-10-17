@@ -5,13 +5,15 @@ A conversation with a custom agent has `active_participants =
 ["custom:<agent id>"]`; app/agent/runner.py then swaps Milo's system prompt
 for CUSTOM_AGENT_PROMPT plus the agent's own job text, and offers only the
 read-only tools below. Scheduled runs (weekly on Mondays, monthly on the
-1st) are started by the Celery beat task in app/tasks.py via `run_due()`;
-each run is a normal conversation owned by the agent's creator, who gets
-an email when it's done.
+1st) are started by `run_due()` — from Vercel Cron (GET /internal/cron/agents
+in app/routers/cron.py) when hosted on Vercel, or from the Celery beat task
+in app/tasks.py when self-hosted. Each run is a normal conversation owned
+by the agent's creator, who gets an email when it's done.
 """
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -68,32 +70,39 @@ def job_block(agent: CustomAgent) -> dict:
     }
 
 
-async def run_due(now: datetime | None = None) -> list[dict]:
-    """Starts every scheduled run that's due. Each agent is claimed with a
-    conditional UPDATE first, so overlapping beat ticks can't run it twice."""
+async def run_due(now: datetime | None = None, *, budget_seconds: float | None = None) -> list[dict]:
+    """Runs every scheduled agent that's due, one at a time. Each is claimed
+    with a conditional UPDATE first, so overlapping ticks can't run it
+    twice. With `budget_seconds` (a serverless time limit), it stops
+    starting new runs once the budget is spent; agents not reached stay due
+    for the next tick."""
     from app.agent.runner import run_turn  # runner imports this module
 
+    started = time.monotonic()
     now = now or datetime.now(timezone.utc)
     summaries: list[dict] = []
     async with SessionLocal() as db:
-        due = (
-            await db.execute(
-                select(CustomAgent).where(CustomAgent.schedule != "manual", CustomAgent.next_run_at <= now)
-            )
-        ).scalars().all()
-        claimed: list[CustomAgent] = []
-        for agent in due:
+        while budget_seconds is None or time.monotonic() - started < budget_seconds:
+            agent = (
+                await db.execute(
+                    select(CustomAgent)
+                    .where(CustomAgent.schedule != "manual", CustomAgent.next_run_at <= now)
+                    .order_by(CustomAgent.next_run_at)
+                    .limit(1)
+                )
+            ).scalars().first()
+            if agent is None:
+                break
             got = await db.execute(
                 update(CustomAgent)
                 .where(CustomAgent.id == agent.id, CustomAgent.next_run_at <= now)
                 .values(next_run_at=next_run(agent.schedule, now), last_run_at=now)
                 .returning(CustomAgent.id)
             )
-            if got.scalar_one_or_none() is not None:
-                claimed.append(agent)
-        await db.commit()
+            await db.commit()
+            if got.scalar_one_or_none() is None:
+                continue  # another tick claimed it first
 
-        for agent in claimed:
             creator = await db.get(User, agent.created_by_user_id) if agent.created_by_user_id else None
             if creator is None:
                 summaries.append({"agent": str(agent.id), "status": "skipped", "reason": "creator gone"})

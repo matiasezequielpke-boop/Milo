@@ -16,7 +16,6 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-import litellm
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,6 +38,10 @@ def _require_key() -> str:
 
 async def embed_text(text: str) -> list[float]:
     api_key = _require_key()
+    try:
+        import litellm  # large; not part of the Vercel deployment (requirements-extras.txt)
+    except ImportError as exc:
+        raise ToolNotConfiguredError("LiteLLM isn't installed on this server (requirements-extras.txt).") from exc
     response = await litellm.aembedding(model=EMBEDDING_MODEL, input=[text], api_key=api_key)
     return response.data[0]["embedding"]
 

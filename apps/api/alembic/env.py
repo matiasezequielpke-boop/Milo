@@ -17,11 +17,12 @@ from sqlalchemy import pool
 # alembic.ini and this file both live at apps/api/, so that's the root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
 
 from app.config import get_settings
+from app.db import engine_options
 from app.models import Base
 
 config = context.config
@@ -32,16 +33,11 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
-def _async_database_url() -> str:
-    url = get_settings().database_url
-    if url.startswith("postgresql+asyncpg://"):
-        return url
-    if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    return url
-
-
-config.set_main_option("sqlalchemy.url", _async_database_url())
+# Same URL handling as the app (Supabase's pooled URL included).
+_url, _options = engine_options(get_settings().database_url)
+_options.pop("pool_recycle", None)
+_options["poolclass"] = pool.NullPool
+config.set_main_option("sqlalchemy.url", _url.render_as_string(hide_password=False).replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:
@@ -63,11 +59,7 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    connectable = create_async_engine(_url, **_options)
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

@@ -42,6 +42,8 @@ def _derive_dev_key(app_secret_key: str) -> bytes:
 
 def _fernet() -> Fernet:
     settings = get_settings()
+    if not settings.vault_encryption_key and settings.app_env == "production":
+        raise VaultError("VAULT_ENCRYPTION_KEY isn't set on this server, so bank access can't be stored safely.")
     key = settings.vault_encryption_key or _derive_dev_key(settings.app_secret_key)
     if isinstance(key, str):
         key = key.encode("utf-8")

@@ -231,3 +231,29 @@ async def test_export_and_account_deletion_cover_agents(client, family):
     assert r.status_code == 200, r.text
     left = (await client.get(f"/households/{hid}/agents", headers=auth(ROSA))).json()
     assert [a["name"] for a in left] == ["Bills watch"]
+
+
+async def test_cron_endpoint_needs_the_secret(client, family, monkeypatch):
+    await _make(client, family["household_id"], schedule="weekly")
+    r = await client.get("/internal/cron/agents")
+    assert r.status_code == 401  # no CRON_SECRET configured: always refused
+
+    monkeypatch.setenv("CRON_SECRET", "s3cret-for-tests")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    assert (await client.get("/internal/cron/agents", headers={"Authorization": "Bearer wrong"})).status_code == 401
+    r = await client.get("/internal/cron/agents", headers={"Authorization": "Bearer s3cret-for-tests"})
+    assert r.status_code == 200 and r.json() == {"runs": []}  # nothing due yet
+
+
+async def test_run_due_respects_its_time_budget(client, family):
+    await _make(client, family["household_id"], schedule="weekly")
+    async with SessionLocal() as db:
+        await db.execute(update(CustomAgent).values(next_run_at=datetime(2026, 10, 19, 13, tzinfo=timezone.utc)))
+        await db.commit()
+    # A spent budget starts nothing; the agent stays due for the next tick.
+    assert await custom_agents.run_due(datetime(2026, 10, 19, 13, 5, tzinfo=timezone.utc), budget_seconds=0) == []
+    async with SessionLocal() as db:
+        [row] = (await db.execute(select(CustomAgent))).scalars().all()
+        assert row.last_run_at is None

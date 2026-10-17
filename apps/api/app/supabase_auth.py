@@ -54,7 +54,9 @@ def _base(service: bool = False) -> tuple[str, dict[str, str]]:
             raise SupabaseAuthNotConfiguredError("SUPABASE_SERVICE_ROLE_KEY not set.")
         key = settings.supabase_service_role_key
     headers = {"apikey": key, "Content-Type": "application/json"}
-    if service:
+    # A legacy service_role key is a JWT and goes in Authorization too; the
+    # newer sb_secret_ keys are only accepted as `apikey`.
+    if service and not key.startswith("sb_secret_"):
         headers["Authorization"] = f"Bearer {key}"
     return f"{settings.supabase_url.rstrip('/')}/auth/v1", headers
 

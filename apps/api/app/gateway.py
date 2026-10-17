@@ -18,13 +18,24 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
-import litellm
-
 from app.config import get_settings
 
 
 class ModelNotConfiguredError(RuntimeError):
     """Raised when a model provider is requested but has no API key set."""
+
+
+def _litellm():
+    # Imported on use: LiteLLM is large and only this legacy (household-less)
+    # chat path needs it, so the Vercel deployment leaves it out
+    # (requirements-extras.txt).
+    try:
+        import litellm
+    except ImportError as exc:
+        raise ModelNotConfiguredError(
+            "LiteLLM isn't installed on this server (requirements-extras.txt), so this chat path is off."
+        ) from exc
+    return litellm
 
 
 # Maps our own short model ids (what the frontend's selector cycles through)
@@ -60,7 +71,7 @@ def _require_key(model: str) -> tuple[str, str]:
 async def complete(request: CompletionRequest) -> str:
     """Non-streaming completion. Raises ModelNotConfiguredError pre-Fase-0."""
     litellm_model, api_key = _require_key(request.model)
-    response = await litellm.acompletion(
+    response = await _litellm().acompletion(
         model=litellm_model,
         messages=request.messages,
         api_key=api_key,
@@ -75,7 +86,7 @@ async def stream_complete(request: CompletionRequest) -> AsyncIterator[str]:
     pre-Fase-0, same as `complete()`.
     """
     litellm_model, api_key = _require_key(request.model)
-    response = await litellm.acompletion(
+    response = await _litellm().acompletion(
         model=litellm_model,
         messages=request.messages,
         api_key=api_key,

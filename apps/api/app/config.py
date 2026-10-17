@@ -8,6 +8,7 @@ email): no key means a clear, typed error, never a fake result.
 """
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,18 +23,31 @@ class Settings(BaseSettings):
     # Public URL of this API — enables one-click unsubscribe headers in emails.
     public_api_url: str | None = None
 
-    database_url: str = "postgresql://milo:milo@localhost:5432/milo"
+    # POSTGRES_URL is what Supabase's Vercel integration injects (the
+    # pooled connection string); app/db.py adapts it for asyncpg.
+    database_url: str = Field(
+        "postgresql://milo:milo@localhost:5432/milo", validation_alias=AliasChoices("DATABASE_URL", "POSTGRES_URL")
+    )
     redis_url: str = "redis://localhost:6379/0"
+    # Vercel Cron sends this as a bearer token to /internal/cron/agents.
+    cron_secret: str | None = None
 
     # Identity now lives in Supabase Auth, not this app — see
     # app/supabase_auth.py. supabase_url + supabase_anon_key are enough to
     # verify a user's access token; nothing here can mint one.
-    supabase_url: str | None = None
-    supabase_anon_key: str | None = None
+    # The WARDEN_* names are what the Vercel deploy sets, so they never
+    # collide with the SUPABASE_* variables Supabase's own Vercel
+    # integration adds when it's connected (those win when present).
+    supabase_url: str | None = Field(None, validation_alias=AliasChoices("SUPABASE_URL", "WARDEN_SUPABASE_URL"))
+    supabase_anon_key: str | None = Field(
+        None, validation_alias=AliasChoices("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEY", "WARDEN_SUPABASE_ANON_KEY")
+    )
     # Server-only. Lets sign-up create an already-confirmed account (so a new
     # user is in straight away) and lets account deletion remove the
     # Supabase user too. Never sent to the browser.
-    supabase_service_role_key: str | None = None
+    supabase_service_role_key: str | None = Field(
+        None, validation_alias=AliasChoices("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY")
+    )
     # Two-step login: the password check opens a window this long for the
     # emailed code; then the person starts again.
     login_challenge_minutes: int = 10
