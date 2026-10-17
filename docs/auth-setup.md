@@ -11,6 +11,8 @@ The API (`apps/api/app/routers/auth.py`) runs both flows in front of Supabase Au
 
 ### 1. API environment (the server that runs `apps/api`)
 
+In production this is the Vercel project `warden-api` with the Supabase project `warden` (ref `qtlnrxfbdtckruwtekhb`). The URL, publishable key, site/API URLs and CORS are already set there (as `WARDEN_SUPABASE_*` and the rest — see [deploy.md](deploy.md)); the service role key and the database URL are the owner's to add.
+
 | Variable | Value |
 |---|---|
 | `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
@@ -40,7 +42,7 @@ Leave `DEMO_MODE` off for real accounts. If it's on, the login page also offers 
 
 | Variable | Value |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | The API's public URL |
+| `NEXT_PUBLIC_API_URL` | The API's public URL (set: `https://warden-api-three.vercel.app`) |
 | `NEXT_PUBLIC_BUSINESS_NAME` | Legal company name, once incorporated (default "Warden") |
 | `NEXT_PUBLIC_BUSINESS_ADDRESS` | Registered address, once it exists |
 | `NEXT_PUBLIC_CONTACT_EMAIL` | Support / privacy contact |

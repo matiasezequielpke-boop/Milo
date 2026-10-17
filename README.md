@@ -18,6 +18,8 @@ Warden helps families protect an older parent's money. It watches the parent's b
 | Shared, append-only audit log | `audit_log`, `GET /households/{id}/audit` | Built, tested |
 | Agents the family makes: a name, a face, one job, run on demand or weekly/monthly; read-only tools only; make/change/delete from the Cast page or the sidebar | `apps/api/app/custom_agents.py`, `routers/custom_agents.py`, `apps/web/components/CustomAgentSheet.tsx` | Built, tested. Scheduled runs need the Celery worker + beat below |
 
+Deployed: web https://milo-lilac.vercel.app (Vercel `milo`), API https://warden-api-three.vercel.app (Vercel `warden-api`), database and sign-in on Supabase `warden`. Both Vercel projects deploy on every push to `main`. Details and what's left to configure: [`docs/deploy.md`](docs/deploy.md).
+
 Nothing answers with scripted text and nothing fakes a provider: with a key missing, the feature says exactly which key is missing. Fakes exist only inside `apps/api/tests/`. How money moves, and what must change before real money: [`docs/money-plan.md`](docs/money-plan.md).
 
 ### Run it locally
